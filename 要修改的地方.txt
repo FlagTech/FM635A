@@ -1,0 +1,19 @@
+1. Flag_for_AIfES
+2. 模組名稱明確
+3. 
+
+math.data
+
+math.std_data_config.stdType
+
+訓練前inference可以拿掉
+
+adc AIfES init
+
+globalVar.reader.debugInfoTypeConfig(FM635A_ModelLite::INFO_BASE);
+
+FM635A_ModelLite::MCU_SUPPORT_ESP32 default MCU_SUPPORT_ESP32
+
+LAB05規定筆數
+
+page1/2/3: diplay寫法 

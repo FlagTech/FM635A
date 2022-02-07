@@ -1,0 +1,6 @@
+0. ESP32 for Arduino
+1. AIfES for Arduino
+2. HX711
+3. Adafruit_GFX
+4. Adafruit_SSD1306
+3. FM635A_Lib
