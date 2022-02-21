@@ -1,5 +1,6 @@
-uint16_t label_dim = 1;
-float label_wave[]={
+const uint16_t label_dim = 1;
+const float wave_val_max = 1.0;
+const float wave_val[]={
 0.00,
 0.07,
 0.14,

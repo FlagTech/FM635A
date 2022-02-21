@@ -1,5 +1,7 @@
-uint16_t feature_dim = 1;
-float feature_degree[]={
+// 特徵資料樣本數
+#define SAMPLE_TOTAL (sizeof(degree)/sizeof(degree[0]))
+const uint16_t feature_dim = 1;
+const float degree[]={
 0,
 4,
 8,

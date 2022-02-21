@@ -1,10 +1,13 @@
-#define BITS 10  // 10位元解析度
+/*
+  讀取ADC值範例
+*/
+#define BITS 10
 
 void setup() {
   Serial.begin(115200);
 
   analogSetAttenuation(ADC_11db); // 衰減11db, 目的是可以量測到3.3v的輸入電壓
-  analogSetWidth(10);             // 10位元解析度
+  analogSetWidth(BITS);           // 10位元解析度
 }
 
 void loop() {

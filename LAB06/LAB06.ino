@@ -5,160 +5,130 @@
   網絡結構為1-10(relu))-10(relu)-1(relu)，使用relu作為激活函數。
   使用Glorot初始化。
   使用ADAM優化器的訓練。
-  優化器執行1900個 epoch 的批量訓練。
+  優化器執行100個 epoch 的批量訓練。
   計算在 float 32 中完成。
 */
-#include <FM635A_Utilities.h>
-#include <FM635A_ModelLite.h>
+#include <Flag_DataReader.h>
+#include <Flag_Model.h>
 
-//全域變數
-struct{
-  FM635A_ModelLite::DataReader reader;
-  FM635A_ModelLite::Model model; 
-  FM635A_Utilities::Statistics math;
-  float *data;
-  float *label;
-  uint32_t dataLen;
-  uint32_t featureInputNum;
-  uint32_t labelInputNum;
-  uint32_t labelDataLen;
-  uint32_t featureDataLen;
-  float mean;
-  float std;
-}globalVar;
+// ------------全域變數------------
+Flag_DataReader reader;
+Flag_DataBuffer *data;
+Flag_Model model; 
+
+// 訓練用的特徵資料
+float *train_feature_data;
+
+// 對應特徵資料的標籤值
+float *train_label_data;
+
+// 資料預處理會用到的參數
+float mean;
+float sd;
+float labelMax;
+// -------------------------------
 
 void setup() {
-  //UART config
+  // UART設置
   Serial.begin(115200);
 
-  //ADC config
-  analogSetAttenuation(ADC_11db); // 衰減11db, 目的是可以量測到3.3v
-  analogSetWidth(10);             // 10位元解析度
+  // 回歸類型的資料讀取
+  data = reader.read("/dataset/weight.txt", reader.MODE_REGRESSION);
 
-  //回歸類型的資料讀取
-  globalVar.reader.debugInfoTypeConfig(FM635A_ModelLite::INFO_SIMPLE);
-  globalVar.reader.config(FM635A_ModelLite::MCU_SUPPORT_ESP32, "/dataset/weight.txt", FM635A_ModelLite::MODE_REGRESSION);
-  globalVar.reader.read();
-  
-  globalVar.data = globalVar.reader.regressionData.feature;                      //get data
-  globalVar.label = globalVar.reader.regressionData.label;                       //get label
-  globalVar.dataLen = globalVar.reader.regressionData.dataLen;                   //資料筆數
-  globalVar.featureInputNum = globalVar.reader.regressionData.featureInputNum;   //特徵輸入維度
-  globalVar.labelInputNum = globalVar.reader.regressionData.labelInputNum;       //label維度
-  globalVar.featureDataLen = globalVar.reader.regressionData.featureDataArryLen; //data的陣列長度(以1維陣列來看)
-  globalVar.labelDataLen = globalVar.reader.regressionData.labelDataArryLen;     //label的陣列長度(以1維陣列來看)
+  // 設定訓練用的特徵資料
+  train_feature_data = data->feature;
 
-  //回歸類型的資料確認
-  for(int j = 0; j < globalVar.reader.regressionData.dataLen; j++){
-    Serial.print(F("Feature Data :"));
-    for(int i = 0; i < globalVar.reader.regressionData.featureInputNum; i++){
-      Serial.print(globalVar.data[i + j * globalVar.reader.regressionData.featureInputNum]);
-      if(i != globalVar.reader.regressionData.featureInputNum - 1){
-        Serial.print(F(","));
-      }
-    }
-    Serial.print(F("\t\t"));
+  // 設定對應特徵資料的標籤值
+  train_label_data = data->label;
 
-    Serial.print("Label Data :");
-    for(int i = 0; i < globalVar.reader.regressionData.labelInputNum; i++){
-      Serial.print(globalVar.label[i +  j * globalVar.reader.regressionData.labelInputNum]);
-      if(i != globalVar.reader.regressionData.labelInputNum - 1){
-        Serial.print(F(","));
-      }
-    }
-    Serial.println(F(""));
+  // 取得特徵資料的平均值
+  mean = data->featureMean;
+
+  // 取得特徵資料的標準差
+  sd = data->featureSd;
+
+  // 取得標籤資料的最大絕對值
+  labelMax = data->labelMax; 
+
+  // 特徵資料正規化: 標準差法
+  for(int j = 0; j < data->featureDataArryLen; j++){
+    train_feature_data[j] = (train_feature_data[j] - mean) / sd;
   }
 
-  //重要!!!
-  //AIfES 需要隨機權重進行訓練
-  //這裡的隨機種子是由類比引腳的雜訊產生的
-  uint32_t aRead;
-  aRead = analogRead(A5);
-  srand(104);
-
-  // 資料預處理, data使用正規化之標準差化
-  // 計算data平均值
-  globalVar.math.mean_data_config.dataLen = globalVar.featureDataLen; 
-  globalVar.math.mean_data_config.dataType = FM635A_Utilities::DATA_TYPE_F32;
-  globalVar.math.mean_data_config.paraBuf = globalVar.data;
-  globalVar.mean = globalVar.math.mean();
-  Serial.print("mean: ");
-  Serial.println(globalVar.mean);
-
-  // 計算data標準差
-  globalVar.math.std_data_config.dataLen = globalVar.featureDataLen;
-  globalVar.math.std_data_config.stdType = FM635A_Utilities::STATISTICS_POPULATION;
-  globalVar.math.std_data_config.dataType = FM635A_Utilities::DATA_TYPE_F32;
-  globalVar.math.std_data_config.paraBuf = globalVar.data;
-  globalVar.std = globalVar.math.std();
-  Serial.print("std: ");
-  Serial.println(globalVar.std);
-        
-  //特徵資料正規化: 標準差法
-  for(int j = 0; j < globalVar.featureDataLen; j++){
-    globalVar.data[j] = (globalVar.data[j] - globalVar.mean) / globalVar.std;
+  // 標籤資料正規化: Min/Max法
+  for(int j = 0; j < data->labelDataArryLen; j++){
+    train_label_data[j] /= labelMax;  
   }
-
-  //標籤資料正規化: Min/Max法
-  for(int j = 0; j < globalVar.labelDataLen; j++){
-    globalVar.label[j] /= 1000; //最大值為1000g
-  }
-  
-  Serial.println(F("HX711 - Weight training demo"));
-  Serial.println(F("Type >training< to start"));
+  Serial.println(F("----- 訓練<HX711 - 重量>特性圖範例 -----"));
+  Serial.println();
 }
 
 void loop() {
+  // -------------------------- 建構與訓練模型 --------------------------
+  // 創建訓練用的特徵張量
+  uint16_t train_feature_shape[] = {data->dataLen, data->featureDim};
+  aitensor_t train_feature_tensor = AITENSOR_2D_F32(train_feature_shape, train_feature_data);
 
-  while(Serial.available() > 0 ){
-    String str = Serial.readString();
-    if(str.indexOf("training") > -1)
-    {
-        // 取得訓練用的特徵張量
-        float *input_training_data = globalVar.data;
-        uint16_t input_training_shape[] = {globalVar.dataLen, globalVar.featureInputNum};
-        aitensor_t input_training_tensor = AITENSOR_2D_F32(input_training_shape, input_training_data);
-    
-        // 取得訓練用的標籤張量
-        float *target_data = globalVar.label;
-        uint16_t target_shape[] = {globalVar.dataLen, globalVar.labelInputNum}; 
-        aitensor_t target_training_tensor = AITENSOR_2D_F32(target_shape, target_data); 
+  // 創建訓練用的標籤張量
+  uint16_t train_label_shape[] = {data->dataLen, data->labelDim}; 
+  aitensor_t train_label_tensor = AITENSOR_2D_F32(train_label_shape, train_label_data); 
 
-        //定義神經層
-        FM635A_ModelLite::modelTrainParameter modelTrainPara;
-        modelTrainPara.input_tensor  = &input_training_tensor;
-        modelTrainPara.target_tensor = &target_training_tensor;
-        modelTrainPara.layerSize = 4;
-        FM635A_ModelLite::layerSequence nnStructure[] = {{FM635A_ModelLite::LAYER_INPUT,  0, FM635A_ModelLite::ACTIVATION_NONE},  // input layer
-                                                         {FM635A_ModelLite::LAYER_DENSE, 10, FM635A_ModelLite::ACTIVATION_RELU},  // hidden layer
-                                                         {FM635A_ModelLite::LAYER_DENSE, 10, FM635A_ModelLite::ACTIVATION_RELU},  // hidden layer
-                                                         {FM635A_ModelLite::LAYER_DENSE,  1, FM635A_ModelLite::ACTIVATION_RELU},};// output layer
-                                                        
-        modelTrainPara.layerSeq = nnStructure;
-        modelTrainPara.lossFuncType  = FM635A_ModelLite::LOSS_FUNC_MSE;
-        modelTrainPara.optimizerPara = {FM635A_ModelLite::OPTIMIZER_ADAM, 0.001, 100, 10}; //optimizer type, learning rate, epochs, batch-size
-        
-        //訓練模型 
-        globalVar.model.train(&modelTrainPara);
+  // 創建模型
+  Flag_ModelParameter modelPara;
+  Flag_LayerSequence nnStructure[] = {{.layerType = model.LAYER_INPUT, .neurons =  0, .activationType = model.ACTIVATION_NONE},  // input layer
+                                      {.layerType = model.LAYER_DENSE, .neurons = 10, .activationType = model.ACTIVATION_RELU},  // hidden layer
+                                      {.layerType = model.LAYER_DENSE, .neurons = 10, .activationType = model.ACTIVATION_RELU},  // hidden layer
+                                      {.layerType = model.LAYER_DENSE, .neurons =  1, .activationType = model.ACTIVATION_RELU}}; // output layer          
+  modelPara.inputLayerPara = {.dim = train_feature_tensor.dim, .shape = train_feature_shape};
+  modelPara.layerSize = ARRAY_LEN(nnStructure);                    
+  modelPara.layerSeq = nnStructure;
+  modelPara.lossFuncType  = model.LOSS_FUNC_MSE;
+  modelPara.optimizerPara = {.optimizerType = model.OPTIMIZER_ADAM, .learningRate = 0.001, .epochs = 100, .batch_size = 10};
+  model.begin(&modelPara);
 
-        // ----------------------------------------- 評估模型 --------------------------
-        // 使用訓練好的模型來預測
-        uint16_t input_test_shape[] = {1, 1}; 
-        float input_test_data[1];  
-        aitensor_t input_test_tensor = AITENSOR_2D_F32(input_test_shape, input_test_data);
-        aitensor_t *output_test_tensor;
-        Serial.print("HX711量測值  模型預測值:");
-        for(int i = 0; i >= -1000; i--){ //i是HX711量測到的值
-          //正規化: 標準差法
-          input_test_data[0] = (i - globalVar.mean) / globalVar.std;
-          output_test_tensor = globalVar.model.predict(&input_test_tensor);
-          Serial.print(i);
-          Serial.print(" ");
-          Serial.println(((float* ) output_test_tensor->data)[0] * 1000.0); //因為標籤資料有經過正規化, 所以要*1000將比例還原回來
-        }
-        while(1);
-     }else{
-      Serial.println(F("unknown"));
-    }
+  // 訓練模型 
+  model.train(&train_feature_tensor, &train_label_tensor);
+  
+  // 匯出模型
+  model.save();
+
+  // -------------------------- 評估模型 --------------------------
+  // 使用訓練好的模型來預測
+  float eval_feature_data[1];  
+  uint16_t eval_feature_shape[] = {1, data->featureDim}; 
+  aitensor_t eval_feature_tensor = AITENSOR_2D_F32(eval_feature_shape, eval_feature_data);
+  aitensor_t *eval_output_tensor;
+
+  Serial.println("量測值:\t\t預測值:");
+  for(int i = 0; i >= -1000; i--){ //i是HX711量測到的值
+    //正規化: 標準差法
+    eval_feature_data[0] = (i - mean) / sd;
+    eval_output_tensor = model.predict(&eval_feature_tensor);
+    Serial.print(i);
+    Serial.print(F("\t\t"));
+    Serial.println(((float* ) eval_output_tensor->data)[0] * labelMax); //因為標籤資料有經過正規化, 所以要*1000將比例還原回來
   }
+
+  while(1);
 }
+
+// 確認讀取到的資料
+// for(int j = 0; j < data->dataLen; j++){
+//   Serial.print(F("Feature Data :"));
+//   for(int i = 0; i < data->featureDim; i++){
+//     Serial.print(data->feature[i + j * data->featureDim]);
+//     if(i != data->featureDim - 1){
+//       Serial.print(F(","));
+//     }
+//   }
+//   Serial.print(F("\t\t"));
+
+//   Serial.print("Label Data :");
+//   for(int i = 0; i < data->labelDim; i++){
+//     Serial.print(data->label[i +  j * data->labelDim]);
+//     if(i != data->labelDim - 1){
+//       Serial.print(F(","));
+//     }
+//   }
+//   Serial.println(F(""));
+// }

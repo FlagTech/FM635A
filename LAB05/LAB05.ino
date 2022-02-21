@@ -4,10 +4,13 @@
 #include <HX711.h>
 #include <SPIFFS.h>
 
+#define FEATURE_TOTAL_MAX 100
+
 HX711 hx(16, 17, 128, -0.0011545); 
 
 double var_offset = 0; //offset變數
 double var_weight = 0; //weight變數
+uint8_t dataCount = 0;
 
 void setup() {
   Serial.begin(115200);
@@ -64,6 +67,15 @@ void loop() {
     
   while(Serial.available() > 0 ){
     String str = Serial.readStringUntil('\n');
+  }
+
+  dataCount++;
+
+  if(dataCount >= FEATURE_TOTAL_MAX){
+    Serial.print("已收集了");
+    Serial.print(FEATURE_TOTAL_MAX);
+    Serial.print("筆資料, 不用在收集了, 請複製特徵資料與標籤資料並存成csv檔案");
+    while(1);
   }
 }
 

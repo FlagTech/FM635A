@@ -1,4 +1,9 @@
+/*
+  PWM功能範例
+*/
 #define BITS 10
+#define INVERT(x) ((1 << BITS) - 1 - x)
+#define DUTY(x)   ((int)((x / 100.0) * ((1 << BITS) - 1)))
 
 void setup() {
   pinMode(LED_BUILTIN, OUTPUT);
@@ -8,13 +13,14 @@ void setup() {
 }
 
 void loop() {
-  for(int i = 0; i<512 ;i++){
-    ledcWrite(0, 1023-i);
+  // Duty cycle於0% ~ 50%往復調整
+  for(int i = DUTY(0); i < DUTY(50); i++){
+    ledcWrite(0, INVERT(i)); //內建的LED接腳為LOW致動, 所以須將電壓反向
     delay(2);
   }
 
-  for(int i = 512; i>0 ;i--){
-    ledcWrite(0, 1023-i);
+  for(int i = DUTY(50); i > DUTY(0); i--){
+    ledcWrite(0, INVERT(i)); //內建的LED接腳為LOW致動, 所以須將電壓反向
     delay(2);
   }
 }

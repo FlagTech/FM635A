@@ -1,19 +1,27 @@
-1. Flag_for_AIfES
-2. 模組名稱明確
-3. 
+模組檔名灌Flag前缀詞  //OK
+類別分類切割明確  //OK
+修掉math.data結構 //OK
+修掉math.std_data_config.stdType    //OK
+第一個模型的訓練前inference可以拿掉 //OK
+adc AIfES init包道model裡 //OK
+globalVar.reader.debugInfoTypeConfig(FM635A_ModelLite::INFO_BASE); //OK
+FM635A_ModelLite::MCU_SUPPORT_ESP32 default MCU_SUPPORT_ESP32 //OK
+LAB05規定筆數 //OK
+page1/2/3: diplay寫法 //OK
+Button狀態修正成只有兩個狀態, 而無除彈跳狀態 //OK
 
-math.data
 
-math.std_data_config.stdType
+範圍::運算子通通拿掉 //OK
+enum用model.存 //OK
 
-訓練前inference可以拿掉
+libray名稱改成FLAG_AIfES //OK
 
-adc AIfES init
+範例流程統一 加上註解
+//步驟1
+//步驟2
+//.....
 
-globalVar.reader.debugInfoTypeConfig(FM635A_ModelLite::INFO_BASE);
-
-FM635A_ModelLite::MCU_SUPPORT_ESP32 default MCU_SUPPORT_ESP32
-
-LAB05規定筆數
-
-page1/2/3: diplay寫法 
+data.sd  //OK
+data.mean  //OK
+data.labelMax  //OK
+model使用bein()初始化並與train分開  //OK
