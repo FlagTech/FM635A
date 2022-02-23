@@ -1,3 +1,6 @@
+/*
+  跌倒姿勢記錄 -- 即時預測
+*/
 #include <Flag_DataReader.h>
 #include <Flag_Model.h>
 #include <Flag_MPU6050.h>
@@ -37,8 +40,8 @@ void setup() {
   pinMode(BTN_PIN, INPUT);
   digitalWrite(LED_BUILTIN, LED_OFF);
 
-  // 多元分類類型的資料讀取
-  data = reader.read("/dataset/one.txt,/dataset/two.txt,/dataset/three.txt", reader.MODE_CATEGORICAL); //注意讀檔案順序分別對應到one-hot encoding
+  // 2元分類類型的資料讀取
+  data = reader.read("/dataset/others.txt,/dataset/fall.txt", reader.MODE_BINARY); //注意讀檔案順序分別對應到one-hot encoding
 
   // 取得特徵資料的平均值
   mean = data->featureMean;
@@ -46,24 +49,42 @@ void setup() {
   // 取得特徵資料的標準差
   sd = data->featureSd;
         
-  Serial.println(F("----- 即時預測手寫辨識 -----"));
+  Serial.println(F("----- 即時預測跌倒姿勢 -----"));
   Serial.println();
 }
 
 void loop() {
   // -------------------------- 建構模型 --------------------------
   // 讀取已訓練的模型檔
-  model.begin("/gesture_model.json");
+  model.debugInfoTypeConfig(model.INFO_VERBOSE);
+  model.begin("/fall_model.json");
 
   // -------------------------- 即時預測 --------------------------
   float sensor_data[FEATURE_DIM];
   uint32_t sensorArrayIndex = 0;
   uint32_t collectFinishedCond = 0;
   uint32_t lastMeaureTime = 0;
-  
+  static bool collect = false;
+
   while(1){
-    // 當按鈕按下時開始收集資料   
-    if(btn.read()){
+    //100ms取一次, 共取10次, 也就是一秒
+    if(millis() - lastMeaureTime > 100 && !collect){
+      //mpu6050資料更新  
+      mpu6050.update();
+      if(mpu6050.data.gyrX > 150 || mpu6050.data.gyrX < -150 ||
+         mpu6050.data.gyrY > 150 || mpu6050.data.gyrY < -150 ||
+         mpu6050.data.gyrZ > 150 || mpu6050.data.gyrZ < -150 ||
+         mpu6050.data.accX > 0.25 || mpu6050.data.accX < -0.25 ||
+         mpu6050.data.accY > -0.75 || mpu6050.data.accY < -1.25 ||
+         mpu6050.data.accZ > 0.25 || mpu6050.data.accZ < -0.25)
+      {
+        collect = true;
+      }
+      lastMeaureTime = millis();
+    }
+
+    // 當按鈕按下時開始收集資料 
+    if(collect){
       // 收集資料時, 內建指示燈會亮
       digitalWrite(LED_BUILTIN, LED_ON);
 
@@ -74,32 +95,26 @@ void loop() {
 
         if(collectFinishedCond == PERIOD){
           // 使用訓練好的模型來預測
-          float *test_feature_data = sensor_data; 
-          uint16_t test_feature_shape[] = {1, FEATURE_DIM};
-          aitensor_t test_feature_tensor = AITENSOR_2D_F32(test_feature_shape, test_feature_data);
-          aitensor_t *test_output_tensor;
-          float predictVal[model.getNumOfOutputs()];
+          float *eval_feature_data = sensor_data; 
+          uint16_t eval_feature_shape[] = {1, FEATURE_DIM};
+          aitensor_t eval_feature_tensor = AITENSOR_2D_F32(eval_feature_shape, eval_feature_data);
+          aitensor_t *eval_output_tensor;
+          float predictVal;
 
           // 測試資料預處理
           for(int i = 0; i < FEATURE_DIM ; i++){
-            test_feature_data[i] = (test_feature_data[i] - mean) / sd;
+            eval_feature_data[i] = (eval_feature_data[i] - mean) / sd;
           }
 
           // 模型預測
-          test_output_tensor = model.predict(&test_feature_tensor);
-          model.getResult(test_output_tensor, predictVal);
+          eval_output_tensor = model.predict(&eval_feature_tensor);
+          model.getResult(eval_output_tensor, &predictVal);
           
           // 輸出預測結果
           Serial.print(F("Calculated output: "));
-          model.printResult(predictVal);
+          model.printResult(&predictVal);
 
-          // 找到機率最大的索引值
-          uint8_t maxIndex = model.argmax(predictVal);
-          Serial.print("你寫的數字為: ");
-          Serial.println(maxIndex + 1);
-
-          // 當還按著按鈕則阻塞, 直到放開按鈕
-          while(btn.read());
+          collect = false;
           
         }else{
           sensor_data[sensorArrayIndex] = mpu6050.data.accX; sensorArrayIndex++;

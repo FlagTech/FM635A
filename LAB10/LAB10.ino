@@ -1,3 +1,6 @@
+/*
+  電子相框
+*/
 #include "./inc/bitmap.h"
 #include <Wire.h>
 #include <Adafruit_GFX.h>

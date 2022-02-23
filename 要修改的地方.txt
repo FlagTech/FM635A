@@ -25,3 +25,6 @@ data.sd  //OK
 data.mean  //OK
 data.labelMax  //OK
 model使用bein()初始化並與train分開  //OK
+
+CLASS_TOTAL 拿掉 //OK
+FLAG_MODEL_2D_INPUT_LAYER_DIM修正成FLAG_MODEL_2D_INPUT_LAYER

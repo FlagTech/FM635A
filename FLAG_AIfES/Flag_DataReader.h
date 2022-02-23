@@ -15,7 +15,7 @@ typedef struct {
   uint32_t labelDataArryLen;   //label的陣列長度(以1維陣列來看)
   float featureMean; //特徵資料平均值
   float featureSd;   //特徵資料標準差
-  float labelMax;    //標籤資料最大值(僅用於迴歸分析)
+  float labelMaxAbs;    //標籤資料最大值(僅用於迴歸分析)
 }Flag_DataBuffer;
 
 class Flag_DataReader {
@@ -69,6 +69,9 @@ class Flag_DataReader {
       _debugInfoType = infoType;
     }
 
+    uint32_t getNumOfFiles(){
+      return _fileNum;
+    }
     //Funtion Name: read
     //Purpose: 依據所設定的路徑讀取資料.txt然後將其存入public成員data供user存取
     //Parameter: None
@@ -107,7 +110,7 @@ class Flag_DataReader {
             }
             while(1){}  //blocking
           }
-
+          _fileNum = 1;
           uint8_t get_once = 0;
           char *fileStr  = (char *) malloc(sizeof(char) * file.size());  //用這樣才不會出事, 使用string會非常佔heap; 另外使用stack, 若資料量太大, 也無法完整存入
           uint32_t tempCnt = 0;
@@ -202,7 +205,7 @@ class Flag_DataReader {
           Flag_Statistics stats;
           data.featureMean = stats.mean(data.feature, data.featureDataArryLen); // 計算特徵資料的平均值
           data.featureSd = stats.sd(data.feature, data.featureDataArryLen);     // 計算特徵資料的標準差
-          data.labelMax = stats.max(data.label, data.labelDataArryLen);
+          data.labelMaxAbs = stats.maxAbs(data.label, data.labelDataArryLen);
 
           if(_debugInfoType <= INFO_SIMPLE){
             Serial.printf("資料總數: %d\n", readDataLen);
@@ -212,7 +215,7 @@ class Flag_DataReader {
             Serial.printf("Label Total Len: %d\n", labelIndex);
             Serial.printf("Feature平均值: %d\n", data.featureMean);
             Serial.printf("Feature標準差: %d\n", data.featureSd);
-            Serial.printf("Label MAX: %d\n", data.labelMax);
+            Serial.printf("Label MAX: %d\n", data.labelMaxAbs);
             Serial.println();
           }
 
@@ -257,7 +260,7 @@ class Flag_DataReader {
             }
             while(1){}  //blocking
           }
-          
+          _fileNum = 2;
           //準備fileList存檔名
           //String *fileList = (String *)malloc(sizeof(String) * classifyNum); //多元分類才需要這樣做
           String fileList[2];
@@ -458,7 +461,7 @@ class Flag_DataReader {
           Flag_Statistics stats;
           data.featureMean = stats.mean(data.feature, data.featureDataArryLen); // 計算特徵資料的平均值
           data.featureSd = stats.sd(data.feature, data.featureDataArryLen);     // 計算特徵資料的標準差
-          data.labelMax = 0; //2元分類不用labelMax
+          data.labelMaxAbs = 0; //2元分類不用labelMaxAbs
 
           if(_debugInfoType <= INFO_SIMPLE){
             Serial.printf("Feature平均值: %d\n", data.featureMean);
@@ -497,6 +500,7 @@ class Flag_DataReader {
             }
             while(1){}  //blocking
           }
+          _fileNum = classifyNum;
           
           //準備fileList存檔名
           //String *fileList = (String *)malloc(sizeof(String) * classifyNum); //再研究 這樣會當掉
@@ -720,7 +724,7 @@ class Flag_DataReader {
           Flag_Statistics stats;
           data.featureMean = stats.mean(data.feature, data.featureDataArryLen); // 計算特徵資料的平均值
           data.featureSd = stats.sd(data.feature, data.featureDataArryLen);     // 計算特徵資料的標準差
-          data.labelMax = 0; //多元分類不用labelMax
+          data.labelMaxAbs = 0; //多元分類不用labelMaxAbs
 
           if(_debugInfoType <= INFO_SIMPLE){
             Serial.printf("Feature平均值: %d\n", data.featureMean);
@@ -764,6 +768,7 @@ class Flag_DataReader {
     uint8_t _debugInfoType;
     uint8_t _mode;
     uint8_t _mcu_type;
+    uint32_t _fileNum;
 
     struct _binaryData_t{
       Flag_DataBuffer file[2];

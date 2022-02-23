@@ -1,5 +1,5 @@
 /*
-  PWM功能範例
+  PWM功能
 */
 #define BITS 10
 #define INVERT(x) ((1 << BITS) - 1 - x)

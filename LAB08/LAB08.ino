@@ -1,3 +1,6 @@
+/*
+  讀取按壓開關狀態
+*/
 #include <Flag_Switch.h>
 
 #define LED_ON  0

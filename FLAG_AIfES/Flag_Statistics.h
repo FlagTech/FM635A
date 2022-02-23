@@ -29,8 +29,8 @@ class Flag_Statistics{
       return sqrt(sum);
     }
 
-    //找出最大值
-    float max(float *data, uint32_t len){
+    //找出最大絕對值
+    float maxAbs(float *data, uint32_t len){
       float maximum = 0;
       for(uint32_t i = 0; i < len; i++ ){
         if(i == 0){

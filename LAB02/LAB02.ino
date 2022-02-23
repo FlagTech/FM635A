@@ -1,5 +1,5 @@
 /*
-  讀取ADC值範例
+  讀取ADC值
 */
 #define BITS 10
 

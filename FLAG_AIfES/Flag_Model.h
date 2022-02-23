@@ -6,7 +6,9 @@
 #include <SPIFFS.h>
 #include <ArduinoJson.h>
 
-#define ARRAY_LEN(x) (sizeof(x) / sizeof(x[0]))
+#define FLAG_MODEL_GET_LAYER_SIZE(x)  (sizeof(x) / sizeof(x[0]))
+#define FLAG_MODEL_2D_INPUT_LAYER_DIM(x)  {2, x};
+#define FLAG_MODEL_ARRAY_LEN(x) (sizeof(x) / sizeof(x[0]))
 
 //for Flag_ModelParameter
 typedef struct {
@@ -26,8 +28,8 @@ typedef struct {
 //創建神經網路會用的結構, 目的是包成參數結構餵入創建神經網路的API
 typedef struct {
   struct{
-    uint8_t dim;
-    uint16_t *shape;
+    uint8_t axis;
+    uint16_t dim;
   }inputLayerPara;
   uint32_t layerSize;        
   Flag_LayerSequence *layerSeq;
@@ -82,6 +84,12 @@ class Flag_Model {
       OPTIMIZER_SGD,
     };
 
+    enum{
+      MODE_REGRESSION,
+      MODE_BINARY,
+      MODE_CATEGORICAL,
+    };
+    
     //Flag_Model建構子
     Flag_Model(){
       _debugInfoType = INFO_BASE;
@@ -212,13 +220,13 @@ class Flag_Model {
         //創建各layer並加入到model中, 並用DenseList Node去記著所有的layer, 供後續save model以及initial weight/bias用
         if(para->layerSeq[i].layerType == LAYER_INPUT){
           ailayer_input_t *input_layer = (ailayer_input_t *) malloc(sizeof(ailayer_input_t));
-          uint16_t *input_layer_shape = (uint16_t *) malloc(sizeof(uint16_t) * para->inputLayerPara.dim);  //目前應該都是*2, 因為目前沒有CNN 應該不至於處理到多軸的陣列
+          uint16_t *input_layer_shape = (uint16_t *) malloc(sizeof(uint16_t) * para->inputLayerPara.axis);  //目前應該都是*2, 因為目前沒有CNN 應該不至於處理到多軸的陣列
       
           //目前僅支援2軸tnesor
-          if(para->inputLayerPara.dim == 2){
-            input_layer_shape[0] = 1;                              //第一個元素固定為1, 即便你的input tensor餵了很多筆資料, 仍然是1, 這是參考XOR example的
-            input_layer_shape[1] = para->inputLayerPara.shape[1]; //至於第二個元素則是特徵資料的維度
-            input_layer->input_dim = para->inputLayerPara.dim;
+          if(para->inputLayerPara.axis == 2){
+            input_layer_shape[0] = 1;                         //第一個元素固定為1, 即便你的input tensor餵了很多筆資料, 仍然是1, 這是參考XOR example的
+            input_layer_shape[1] = para->inputLayerPara.dim; //至於第二個元素則是特徵資料的維度
+            input_layer->input_dim = para->inputLayerPara.axis;
             input_layer->input_shape = input_layer_shape;
           }else{
             if(_debugInfoType <= INFO_BASE){
@@ -444,7 +452,48 @@ class Flag_Model {
     aitensor_t *predict(aitensor_t *feature_tensor){
       return aialgo_forward_model(&_model, feature_tensor); // Forward pass (inference)  
     }
-  
+    
+    //取得回歸問題的Result
+    void getResult(aitensor_t *output_tensor, float scale, float *predictVal){
+      for(uint8_t i = 0; i < _outputNum; i++){
+        predictVal[i] = ((float* ) output_tensor->data)[i] * scale; //因為標籤資料有經過正規化, 所以要將label的scale還原回來
+      }
+    }
+
+    //取得分類問題的Result
+    void getResult(aitensor_t *output_tensor, float *predictVal){
+      for(int i = 0; i < _outputNum; i++){
+        predictVal[i] = ((float* ) output_tensor->data)[i]; 
+      } 
+    }
+
+    uint32_t getNumOfOutputs(){
+      return _outputNum;
+    }
+
+    //回歸, 分類問題共用輸出函數
+    void printResult(float *predictVal, String sep =", ", String end = "\n"){
+      for(uint8_t i = 0; i < _outputNum - 1; i++){
+        Serial.print(predictVal[i]);
+        Serial.print(sep);
+      }
+      Serial.print(predictVal[_outputNum-1]);
+      Serial.print(end); 
+    }
+
+    //最大值的索引值
+    uint8_t argmax(float *predictVal){
+      float max = predictVal[0];
+      uint8_t max_index = 0;
+      for(int i = 1; i < _outputNum; i++){
+        if(predictVal[i] > max){
+          max = predictVal[i];
+          max_index = i;
+        }
+      }
+      return max_index;
+    }
+    
     //Funtion Name: train
     //Purpose: 訓練model用的
     //Parameter: None
@@ -588,6 +637,7 @@ class Flag_Model {
     uint32_t _layerSize;
     Flag_ModelParameter _para;
     aiopti_t *_optimizer;
+    uint32_t _outputNum;
 
     //heap record struct
     typedef struct HeapRecord_t{
@@ -879,6 +929,11 @@ class Flag_Model {
           if(_debugInfoType <= INFO_SIMPLE){
             Serial.print(F("神經元個數: "));
             Serial.println(biasTotal);
+          }
+          
+          if(i == doc["layers"].size()-1){
+            //output latyer
+            _outputNum = biasTotal;
           }
 
           //附加Activation Func

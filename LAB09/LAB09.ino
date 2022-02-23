@@ -1,3 +1,6 @@
+/*
+  OLED模組顯示中英文字
+*/
 #include "./inc/myFont.h"
 #include <Wire.h>
 #include <Adafruit_GFX.h>

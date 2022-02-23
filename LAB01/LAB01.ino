@@ -1,5 +1,5 @@
 /*
-  閃爍LED範例
+  閃爍LED
 */
 void setup() {
   pinMode(LED_BUILTIN, OUTPUT);

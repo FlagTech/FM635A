@@ -1,3 +1,6 @@
+/*
+  顯示6軸感測資訊
+*/
 #include <Flag_MPU6050.h>
 
 Flag_MPU6050 mpu6050;
