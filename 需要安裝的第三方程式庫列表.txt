@@ -4,3 +4,4 @@
 3. Adafruit_GFX
 4. Adafruit_SSD1306
 5. FM635A_Lib
+6. ESP32Servo

@@ -1,7 +1,7 @@
 /*
   讓蜂鳴器發出聲音
 */
-#define BUZZER_PIN 10
+#define BUZZER_PIN 32
 
 void setup() {
   pinMode(BUZZER_PIN, OUTPUT);

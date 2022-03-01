@@ -1,20 +1,20 @@
  /*
   電子料理秤 -- 訓練與評估
-  --------------------
-  該草圖展現如何在AIfES中使用訓練數據來訓練神經網絡。
-  網絡結構為1-10(relu))-10(relu)-1(relu)，使用relu作為激活函數。
-  使用Glorot初始化。
-  使用ADAM優化器的訓練。
-  優化器執行100個 epoch 的批量訓練。
-  計算在 float 32 中完成。
 */
 #include <Flag_DataReader.h>
 #include <Flag_Model.h>
+#include <HX711.h>
 
 // ------------全域變數------------
+// 讀取資料的物件
 Flag_DataReader reader;
 Flag_DataBuffer *data;
+
+// 神經網路模型
 Flag_Model model; 
+
+// 感測器的物件
+HX711 hx(16, 17, 128, -0.0011545); 
 
 // 訓練用的特徵資料
 float *train_feature_data;
@@ -62,9 +62,7 @@ void setup() {
 
   Serial.println(F("----- 訓練<HX711 - 重量>特性圖範例 -----"));
   Serial.println();
-}
 
-void loop() {
   // -------------------------- 建構模型 --------------------------
   Flag_ModelParameter modelPara;
   Flag_LayerSequence nnStructure[] = {{.layerType = model.LAYER_INPUT, .neurons =  0, .activationType = model.ACTIVATION_NONE},  // input layer
@@ -92,7 +90,9 @@ void loop() {
 
   // 匯出模型
   model.save();
+}
 
+void loop() {
   // -------------------------- 評估模型 --------------------------
   // 使用訓練好的模型來預測
   float eval_feature_data;  

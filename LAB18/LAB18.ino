@@ -1,9 +1,11 @@
 /*
-  跌倒偵測警示器
+  雲端跌倒推播系統--IFTTT
 */
+#include "./inc/ifttt.h"
 #include <Flag_DataReader.h>
 #include <Flag_Model.h>
 #include <Flag_MPU6050.h>
+#include <WiFiClientSecure.h>
 
 #define LED_ON  0
 #define LED_OFF 1
@@ -26,6 +28,12 @@ Flag_Model model;
 // 感測器的物件
 Flag_MPU6050 mpu6050;
 
+// 連網會用到的參數
+WiFiClientSecure client;  
+const char* ssid = "Xperia XZ Premium_db49";
+const char* password = "12345678";
+const char* SERVER = "ifttt.com";
+
 // 資料預處理會用到的參數
 float mean;
 float sd;
@@ -37,6 +45,36 @@ uint32_t collectFinishedCond = 0;
 uint32_t lastMeaureTime = 0;
 bool collect = false;
 //--------------------------------
+
+// IFTTT通知LINE
+void notify(){
+  Serial.println("\n開始連接伺服器…");
+  if(!client.connect(SERVER, 443)){
+    Serial.println("連線失敗～");
+  }else{
+    Serial.println("連線成功！");
+    String https_get = "GET https://maker.ifttt.com/trigger/https_test/with/key/dg9J7YHL0mMuDaaRGs9pNU HTTP/1.1\n"\
+                       "Host: " + String(SERVER) + "\n" +\
+                       "Connection: close\n\n";
+                       
+    client.print(https_get);
+
+    while(client.connected()){
+      String line = client.readStringUntil('\n');
+      if (line == "\r") {
+        Serial.println("收到HTTPS回應：");
+        break;
+      }
+    }
+    // 接收並顯示伺服器的回應
+    while(client.available()){
+      char c = client.read();
+      if(c != 0xFF) Serial.print(c);
+      if(c == 0xFF) Serial.println();
+    }
+    client.stop();
+  }
+}
 
 void setup() {
   // UART設置
@@ -51,6 +89,19 @@ void setup() {
   pinMode(LED_BUILTIN, OUTPUT);
   digitalWrite(LED_BUILTIN, LED_OFF);
   digitalWrite(BUZZER_PIN, LOW);
+
+  // Wi-Fi設置
+  WiFi.begin(ssid, password);
+  while (WiFi.status() != WL_CONNECTED) {
+    Serial.print(".");
+    delay(500);
+  }
+
+  Serial.print("\n成功連上基地台!\nIP位址：");
+  Serial.println(WiFi.localIP());
+
+  // 設置CA憑證  
+  client.setCACert(root_ca);
 
   // 2元分類類型的資料讀取
   data = reader.read("/dataset/others.txt,/dataset/fall.txt", reader.MODE_BINARY); //注意讀檔案順序分別對應到one-hot encoding
@@ -88,7 +139,7 @@ void loop() {
     lastMeaureTime = millis();
   }
 
-  // 當開始蒐集資料的條件達成時, 開始蒐集
+ // 當開始蒐集資料的條件達成時, 開始蒐集
   if(collect){
     // 蒐集資料時, 內建指示燈會亮
     digitalWrite(LED_BUILTIN, LED_ON);
@@ -125,6 +176,7 @@ void loop() {
             digitalWrite(BUZZER_PIN, HIGH);
             delay(500);
           }
+          notify();
         }
        
         collect = false;

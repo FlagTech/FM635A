@@ -3,11 +3,18 @@
 */
 #include <Flag_DataReader.h>
 #include <Flag_Model.h>
+#include <HX711.h>
 
 // ------------全域變數------------
+// 讀取資料的物件
 Flag_DataReader reader;
 Flag_DataBuffer *data;
+
+// 神經網路模型
 Flag_Model model; 
+
+// 感測器的物件
+HX711 hx(16, 17, 128, -0.0011545); 
 
 // 資料預處理會用到的參數
 float mean;
@@ -33,13 +40,14 @@ void setup() {
         
   Serial.println(F("----- 即時預測重量 -----"));
   Serial.println();
-}
 
-void loop() {
   // -------------------------- 建構模型 --------------------------
   // 讀取已訓練的模型檔
   model.begin("/weight_model.json");
 
+}
+
+void loop() {
   // -------------------------- 即時預測 --------------------------
   // 使用訓練好的模型來預測
   float test_feature_data;  

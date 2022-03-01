@@ -5,7 +5,7 @@
 
 #define LED_ON  0
 #define LED_OFF 1
-#define INPUT_PIN_NUM 12
+#define INPUT_PIN_NUM 39
 
 Flag_Switch btn(INPUT_PIN_NUM, INPUT);
 

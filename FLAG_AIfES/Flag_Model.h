@@ -224,7 +224,7 @@ class Flag_Model {
       
           //目前僅支援2軸tnesor
           if(para->inputLayerPara.axis == 2){
-            input_layer_shape[0] = 1;                         //第一個元素固定為1, 即便你的input tensor餵了很多筆資料, 仍然是1, 這是參考XOR example的
+            input_layer_shape[0] = 1;                        //第一個元素固定為1, 即便你的input tensor餵了很多筆資料, 仍然是1, 這是參考XOR example的
             input_layer_shape[1] = para->inputLayerPara.dim; //至於第二個元素則是特徵資料的維度
             input_layer->input_dim = para->inputLayerPara.axis;
             input_layer->input_shape = input_layer_shape;
@@ -291,6 +291,7 @@ class Flag_Model {
           //若為最後一層output layer, 將其加入到model
           if(i == para->layerSize - 1){
             _model.output_layer = x;
+            _outputNum = dense_layer->neurons;
           }
           
           //不可在這裡initial權重參數, 會出錯; 所以要記住動態分配出來的dense, 好在後續分配好parameter空間後進行權重的initial

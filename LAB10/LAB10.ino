@@ -11,8 +11,8 @@
 #define SCREEN_HIGHT 64
 #define OLED_RESET -1
 #define PAGE_TOTAL 3
-#define NEXT_PIN_NUM 12
-#define PREV_PIN_NUM 13
+#define NEXT_PIN_NUM 39
+#define PREV_PIN_NUM 34
 
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HIGHT, &Wire, OLED_RESET);
 Flag_Switch nextBtn(NEXT_PIN_NUM, INPUT);

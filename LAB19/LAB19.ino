@@ -1,21 +1,23 @@
 /*
   控制伺服馬達
 */
-void setup()
-{  
-  Serial.begin(115200);
-  ledcSetup(7, 50, 8);  
-  ledcAttachPin(2, 7);  
+#include <ESP32_Servo.h>
+
+#define SERVO_PIN 33
+
+Servo servo;
+
+void setup(){  
+  servo.attach(SERVO_PIN, 500, 2400); // 設定伺服馬達的接腳
 }
 
-void loop()
-{
-  for(int angle = 0; angle <= 180; angle++)
-  {
-    int value=map(angle,0,180,6.4,30.72);
-    ledcWrite(7, value);
-    Serial.println("角度=" + String(angle) + ",value=" + String(value));
-    delay(70);    
+void loop(){
+  for(int angle = 0; angle < 180; angle++){
+    servo.write(angle);
+    delay(15); // 延遲一段時間，讓伺服馬達轉到定位。 
   }
-  delay(1000);
+  for(int angle = 180; angle > 0; angle--){
+    servo.write(angle);
+    delay(15); // 延遲一段時間，讓伺服馬達轉到定位。 
+  }
 }
