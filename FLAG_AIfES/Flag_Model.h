@@ -550,8 +550,8 @@ class Flag_Model {
     void save(String fileName = "model.json"){
       //依據DenseList從Head開始遍歷所有layer來創建json
       _denseListCurrent = _denseListHead;
-
-      DynamicJsonDocument doc(20000);
+ 
+      DynamicJsonDocument doc(heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
       
       int layer = 0;
       while(1){
@@ -731,7 +731,7 @@ class Flag_Model {
 
     void _buildNN(char *jsonFileStr){
       // get Json object; 這裡doc是local var依據官方說法, 函數返回時, 該doc物件被銷毀時自動會釋放掉所占用的heap, 實測沒問題
-      DynamicJsonDocument doc(24576);    // 到https://arduinojson.org/v6/assistant/來評估要留多少的RAM空間, 理論上model.json裏頭要包含這個訊息好動態配置記憶體
+      DynamicJsonDocument doc(heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));    // 到https://arduinojson.org/v6/assistant/來評估要留多少的RAM空間, 理論上model.json裏頭要包含這個訊息好動態配置記憶體
       deserializeJson(doc, jsonFileStr); // str -> json obj
 
       // print出多少層
