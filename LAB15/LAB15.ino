@@ -11,7 +11,7 @@
 // 每10個週期(PERIOD)為一筆特徵資料
 // 2種分類各取30筆(ROUND)
 #define PERIOD 10
-#define ROUND 30
+#define ROUND 50
 #define SENSOR_PARA 6
 #define FEATURE_DIM (PERIOD * SENSOR_PARA)
 #define FEATURE_LEN (FEATURE_DIM * ROUND * 2)

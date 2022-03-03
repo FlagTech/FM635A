@@ -213,9 +213,9 @@ class Flag_DataReader {
             Serial.printf("每筆Label輸入數量: %d\n", labelNum);
             Serial.printf("Feature Total Len: %d\n", dataIndex);
             Serial.printf("Label Total Len: %d\n", labelIndex);
-            Serial.printf("Feature平均值: %d\n", data.featureMean);
-            Serial.printf("Feature標準差: %d\n", data.featureSd);
-            Serial.printf("Label MAX: %d\n", data.labelMaxAbs);
+            Serial.printf("Feature平均值: %f\n", data.featureMean);
+            Serial.printf("Feature標準差: %f\n", data.featureSd);
+            Serial.printf("Label MAX: %f\n", data.labelMaxAbs);
             Serial.println();
           }
 
@@ -464,8 +464,8 @@ class Flag_DataReader {
           data.labelMaxAbs = 0; //2元分類不用labelMaxAbs
 
           if(_debugInfoType <= INFO_SIMPLE){
-            Serial.printf("Feature平均值: %d\n", data.featureMean);
-            Serial.printf("Feature標準差: %d\n", data.featureSd);
+            Serial.printf("Feature平均值: %f\n", data.featureMean);
+            Serial.printf("Feature標準差: %f\n", data.featureSd);
             Serial.println();
           }
             
@@ -494,12 +494,12 @@ class Flag_DataReader {
           }
           
           //多元分類中, 若發現分類數量(檔案數量)<=2個則代表設置錯誤
-          if(classifyNum <= 2){
-            if(_debugInfoType <= INFO_BASE){
-              Serial.println(F("檔案路徑設置錯誤 or 深度學習類型設置錯誤, 請重置"));
-            }
-            while(1){}  //blocking
-          }
+          // if(classifyNum <= 2){
+          //   if(_debugInfoType <= INFO_BASE){
+          //     Serial.println(F("檔案路徑設置錯誤 or 深度學習類型設置錯誤, 請重置"));
+          //   }
+          //   while(1){}  //blocking
+          // }
           _fileNum = classifyNum;
           
           //準備fileList存檔名
@@ -639,7 +639,6 @@ class Flag_DataReader {
               }
             }
             
-            //label 僅有兩類 使用0與1即可, 所以不用特別做one-hot encode
             free(fileStr);//記得一定要把file str給釋放掉
             file.close();
           } //end of file analyze
@@ -727,8 +726,8 @@ class Flag_DataReader {
           data.labelMaxAbs = 0; //多元分類不用labelMaxAbs
 
           if(_debugInfoType <= INFO_SIMPLE){
-            Serial.printf("Feature平均值: %d\n", data.featureMean);
-            Serial.printf("Feature標準差: %d\n", data.featureSd);
+            Serial.printf("Feature平均值: %f\n", data.featureMean);
+            Serial.printf("Feature標準差: %f\n", data.featureSd);
             Serial.println();
           }
 

@@ -83,13 +83,13 @@ void setup() {
   // -------------------------- 建構模型 --------------------------
   Flag_ModelParameter modelPara;
   Flag_LayerSequence nnStructure[] = {{.layerType = model.LAYER_INPUT, .neurons =  0, .activationType = model.ACTIVATION_NONE},     // input layer
-                                      {.layerType = model.LAYER_DENSE, .neurons = 10, .activationType = model.ACTIVATION_RELU},     // hidden layer
+                                      {.layerType = model.LAYER_DENSE, .neurons =  8, .activationType = model.ACTIVATION_RELU},     // hidden layer
                                       {.layerType = model.LAYER_DENSE, .neurons =  1, .activationType = model.ACTIVATION_SIGMOID}}; // output layer
   modelPara.inputLayerPara = FLAG_MODEL_2D_INPUT_LAYER_DIM(data->featureDim);
   modelPara.layerSize = FLAG_MODEL_GET_LAYER_SIZE(nnStructure);
   modelPara.layerSeq = nnStructure;
   modelPara.lossFuncType  = model.LOSS_FUNC_MSE;
-  modelPara.optimizerPara = {.optimizerType = model.OPTIMIZER_ADAM, .learningRate = 0.001, .epochs = 300, .batch_size = 20}; //optimizer type, learning rate, epochs, batch-size
+  modelPara.optimizerPara = {.optimizerType = model.OPTIMIZER_ADAM, .learningRate = 0.001, .epochs = 800, .batch_size = 20}; //optimizer type, learning rate, epochs, batch-size
   model.begin(&modelPara);
 
   // -------------------------- 訓練模型 --------------------------
