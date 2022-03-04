@@ -78,13 +78,12 @@ void setup() {
   }
 
   // 傳送training字串來進行訓練
-  Serial.println(F("----- 訓練wave函數範例 -----"));
-  Serial.println(F("請輸入training來開始訓練"));
+  Serial.println("----- 訓練wave函數範例 -----");
+  Serial.println("請輸入training來開始訓練");
   Serial.println();
 }
 
 void loop() {
-
   while(Serial.available() > 0 ){
     String str = Serial.readString();
     if(str.indexOf("training") > -1)
