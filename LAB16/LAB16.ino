@@ -112,18 +112,22 @@ void loop() {
   // ----------------------------------------- 評估模型 --------------------------
   // 偵測是否要開始蒐集資料
   if(millis() - lastMeaureTime > 100 && !collect){
-    //mpu6050資料更新  
+    // mpu6050資料更新  
     mpu6050.update();
-
-    if(mpu6050.data.gyrX > 150   || mpu6050.data.gyrX < -150  ||
-       mpu6050.data.gyrY > 150   || mpu6050.data.gyrY < -150  ||
-       mpu6050.data.gyrZ > 150   || mpu6050.data.gyrZ < -150  ||
-       mpu6050.data.accX > 0.25  || mpu6050.data.accX < -0.25 ||
-       mpu6050.data.accY > -0.75 || mpu6050.data.accY < -1.25 ||
-       mpu6050.data.accZ > 0.25  || mpu6050.data.accZ < -0.25)
-    {
+    
+    if(mpu6050.data.accY > -0.75){
       collect = true;
     }
+
+    // if(mpu6050.data.gyrX > 150   || mpu6050.data.gyrX < -150  ||
+    //    mpu6050.data.gyrY > 150   || mpu6050.data.gyrY < -150  ||
+    //    mpu6050.data.gyrZ > 150   || mpu6050.data.gyrZ < -150  ||
+    //    mpu6050.data.accX > 0.25  || mpu6050.data.accX < -0.25 ||
+    //    mpu6050.data.accY > -0.75 || mpu6050.data.accY < -1.25 ||
+    //    mpu6050.data.accZ > 0.25  || mpu6050.data.accZ < -0.25)
+    // {
+    //   collect = true;
+    // }
     lastMeaureTime = millis();
   }
 
