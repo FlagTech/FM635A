@@ -134,10 +134,12 @@ void loop(){
     }else{
       // 計算總信號中各種顏色的比例。 它們被標準化為0至1的範圍。
       float sum = red_light + green_light + blue_light;
+
+      // 偵測顏色會用到的參數
       float redRatio = 0;
       float greenRatio = 0;
       float blueRatio = 0;
-      // 偵測顏色會用到的參數
+      
       if(sum != 0){
         redRatio = red_light / sum;
         greenRatio = green_light / sum;
@@ -171,15 +173,9 @@ void loop(){
       // 找到機率最大的索引值
       uint8_t maxIndex = model.argmax(predictVal);
       switch(maxIndex){
-        case 0:
-          Serial.println("品客的蓋子");
-          break;
-        case 1:
-          Serial.println("寶特瓶蓋");
-          break;
-        case 2:
-          Serial.println("黃書皮");
-          break;
+        case 0:  Serial.println("品客的蓋子"); break;
+        case 1:  Serial.println("寶特瓶蓋");   break;
+        case 2:  Serial.println("黃書皮");     break;
       }
       
       delay(1000);

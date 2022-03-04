@@ -62,9 +62,6 @@ void loop(){
 
   if(!apds.readProximity(proximity_data)){
     Serial.println("Error reading proximity value");
-  } else {
-    // Serial.print("Proximity: ");
-    // Serial.println(proximity_data);
   }
 
   // 當開始蒐集資料的條件達成時, 開始蒐集
@@ -97,7 +94,7 @@ void loop(){
       collectFinishedCond++;
       delay(500);
 
-      Serial.println("get到一筆資料");
+      Serial.println("取得一筆資料");
       if(collectFinishedCond == ROUND) showStageInfo = true;
     }
   } else {
