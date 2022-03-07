@@ -33,7 +33,6 @@ uint32_t collectFinishedCond = 0;
 uint32_t lastMeaureTime = 0;
 bool showStageInfo = false;
 bool collect = false;
-bool collectStage = 0;
 //--------------------------------
 
 void setup(){
@@ -58,34 +57,10 @@ void loop(){
     // mpu6050資料更新  
     mpu6050.update();
     
+    // 開始蒐集資料的條件
     if(mpu6050.data.accY > -0.75){
       collect = true;
     }
-     
-    // 依據階段不同, 條件就不同
-    // switch(collectStage){
-    //   case 0: 
-    //     // 非跌倒狀況中, 加速度參數也要拿來做為"是否要開始蒐集資料"的偵測條件
-    //     if(mpu6050.data.gyrX > 150   || mpu6050.data.gyrX < -150  ||
-    //        mpu6050.data.gyrY > 150   || mpu6050.data.gyrY < -150  ||
-    //        mpu6050.data.gyrZ > 150   || mpu6050.data.gyrZ < -150  ||
-    //        mpu6050.data.accX > 0.25  || mpu6050.data.accX < -0.25 ||
-    //        mpu6050.data.accY > -0.75 || mpu6050.data.accY < -1.25 ||
-    //        mpu6050.data.accZ > 0.25  || mpu6050.data.accZ < -0.25 )
-    //     {
-    //       collect = true;
-    //     }
-    //     break;
-    //   case 1:
-    //     // 跌倒狀況中, 主要拿角速度來做為"是否要開始蒐集資料"的偵測條件
-    //     if(mpu6050.data.gyrX > 150 || mpu6050.data.gyrX < -150 ||
-    //        mpu6050.data.gyrY > 150 || mpu6050.data.gyrY < -150 ||
-    //        mpu6050.data.gyrZ > 150 || mpu6050.data.gyrZ < -150 )
-    //     {
-    //       collect = true;
-    //     }
-    //     break;
-    // }
     lastMeaureTime = millis();
   }
  
@@ -104,10 +79,8 @@ void loop(){
         Serial.println("此筆資料蒐集已完成, 可以進行下一筆資料蒐集");
         showStageInfo = true;
 
-        // 若還按著按鈕則阻塞, 直到放開按鈕
-        while(collectBtn.read() == HIGH);
-        while(collectBtn.read() == LOW);
-        Serial.println("Test");
+        // 按下按鈕進行下一筆資料收集
+        while(!collectBtn.read());
         collectFinishedCond = 0;
         collect = false;
       }else{
@@ -125,20 +98,16 @@ void loop(){
     // 未蒐集資料時, 內建指示燈不亮
     digitalWrite(LED_BUILTIN, LED_OFF);
 
-    // 代表資料要重新蒐集
-    
-
     // 每一個階段都會提示該階段蒐集完成的訊息, 並且僅顯示一次
     if(showStageInfo){
       for(int i = 0; i < 2; i++){
         if(sensorArrayIndex == FEATURE_LEN / 2 * (i+1)){
-          if(i == 0){
-            Serial.println("非跌倒資料取樣完成");
-            collectStage++;
-          }else{
-            Serial.println("跌倒資料取樣完成");
-          }       
+
+          if(i == 0) Serial.println("非跌倒資料取樣完成");
+          else       Serial.println("跌倒資料取樣完成");
+
           showStageInfo = false;
+
           if(sensorArrayIndex == FEATURE_LEN){
             // 匯出特徵資料字串
             exporter.dataExport(sensorData, FEATURE_DIM, ROUND, 2);

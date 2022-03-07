@@ -109,11 +109,12 @@ void setup(){
   lastPage = currentPage = 1;
   btnNextPressed = false;
   btnPrevPressed = false;
+  drawPage1();
 }
 
 void loop(){
   if(nextBtn.read()){
-    if(currentPage < PAGE_TOTAL && btnNextPressed) {
+    if(currentPage < PAGE_TOTAL && !btnNextPressed) {
       currentPage++;
       btnNextPressed = true;
     }
@@ -122,7 +123,7 @@ void loop(){
   }
 
   if(prevBtn.read()){
-    if(currentPage > 1 && btnPrevPressed) {
+    if(currentPage > 1 && !btnPrevPressed) {
       currentPage--;
       btnPrevPressed = true;
     }

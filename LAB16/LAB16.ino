@@ -115,19 +115,10 @@ void loop() {
     // mpu6050資料更新  
     mpu6050.update();
     
+    // 開始蒐集資料的條件
     if(mpu6050.data.accY > -0.75){
       collect = true;
     }
-
-    // if(mpu6050.data.gyrX > 150   || mpu6050.data.gyrX < -150  ||
-    //    mpu6050.data.gyrY > 150   || mpu6050.data.gyrY < -150  ||
-    //    mpu6050.data.gyrZ > 150   || mpu6050.data.gyrZ < -150  ||
-    //    mpu6050.data.accX > 0.25  || mpu6050.data.accX < -0.25 ||
-    //    mpu6050.data.accY > -0.75 || mpu6050.data.accY < -1.25 ||
-    //    mpu6050.data.accZ > 0.25  || mpu6050.data.accZ < -0.25)
-    // {
-    //   collect = true;
-    // }
     lastMeaureTime = millis();
   }
 
@@ -159,9 +150,15 @@ void loop() {
         model.getResult(eval_output_tensor, &predictVal);
         
         // 輸出預測結果
-        Serial.print(F("Calculated output: "));
+        Serial.print(F("預測值: "));
         model.printResult(&predictVal);
+        
+        if(predictVal >= 0.85) Serial.println("評估為已跌倒");
+        else                   Serial.println("評估為未跌倒");
 
+        // 下次蒐集特徵資料時, 要重新蒐集
+        sensorArrayIndex = 0;
+        collectFinishedCond = 0;
         collect = false;
         
       }else{
@@ -178,10 +175,5 @@ void loop() {
   }else{
     // 未蒐集資料時, 內建指示燈不亮
     digitalWrite(LED_BUILTIN, LED_OFF);
-
-    // 下次蒐集特徵資料時, 要重新蒐集
-    collectFinishedCond = 0;
-    sensorArrayIndex = 0;
   }
-  
 }

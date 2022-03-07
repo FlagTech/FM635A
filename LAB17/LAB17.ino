@@ -30,7 +30,7 @@ Flag_MPU6050 mpu6050;
 float mean;
 float sd;
 
-// 評估模型會用到的參數
+// 即時預測會用到的參數
 float sensorData[FEATURE_DIM];
 uint32_t sensorArrayIndex = 0;
 uint32_t collectFinishedCond = 0;
@@ -76,13 +76,8 @@ void loop() {
     //mpu6050資料更新  
     mpu6050.update();
 
-    if(mpu6050.data.gyrX > 150   || mpu6050.data.gyrX < -150  ||
-       mpu6050.data.gyrY > 150   || mpu6050.data.gyrY < -150  ||
-       mpu6050.data.gyrZ > 150   || mpu6050.data.gyrZ < -150  ||
-       mpu6050.data.accX > 0.25  || mpu6050.data.accX < -0.25 ||
-       mpu6050.data.accY > -0.75 || mpu6050.data.accY < -1.25 ||
-       mpu6050.data.accZ > 0.25  || mpu6050.data.accZ < -0.25)
-    {
+    // 開始蒐集資料的條件
+    if(mpu6050.data.accY > -0.75){
       collect = true;
     }
     lastMeaureTime = millis();
@@ -100,33 +95,39 @@ void loop() {
 
       if(collectFinishedCond == PERIOD){
         // 取得一筆特徵資料, 並使用訓練好的模型來預測以進行評估
-        float *eval_feature_data = sensorData; 
-        uint16_t eval_feature_shape[] = {1, FEATURE_DIM};
-        aitensor_t eval_feature_tensor = AITENSOR_2D_F32(eval_feature_shape, eval_feature_data);
-        aitensor_t *eval_output_tensor;
+        float *test_feature_data = sensorData; 
+        uint16_t test_feature_shape[] = {1, FEATURE_DIM};
+        aitensor_t test_feature_tensor = AITENSOR_2D_F32(test_feature_shape, test_feature_data);
+        aitensor_t *test_output_tensor;
         float predictVal;
 
         // 測試資料預處理
         for(int i = 0; i < FEATURE_DIM ; i++){
-          eval_feature_data[i] = (eval_feature_data[i] - mean) / sd;
+          test_feature_data[i] = (test_feature_data[i] - mean) / sd;
         }
 
         // 模型預測
-        eval_output_tensor = model.predict(&eval_feature_tensor);
-        model.getResult(eval_output_tensor, &predictVal);
+        test_output_tensor = model.predict(&test_feature_tensor);
+        model.getResult(test_output_tensor, &predictVal);
         
         // 輸出預測結果
-        Serial.print(F("Calculated output: "));
-        model.printResult(&predictVal);
-  
-        // 若為跌倒, 發出警示聲
-        if(predictVal == 1){
+        if(predictVal >= 0.85) {
+          Serial.println("已跌倒");
+
+          // 發出警示聲
           for(int i = 0; i < 5; i++){
             digitalWrite(BUZZER_PIN, HIGH);
             delay(500);
+            digitalWrite(BUZZER_PIN, LOW);
+            delay(500);
           }
+        }else{
+          Serial.println("未跌倒");
         }
-       
+
+        // 下次蒐集特徵資料時, 要重新蒐集
+        sensorArrayIndex = 0;
+        collectFinishedCond = 0;
         collect = false;
         
       }else{
@@ -143,9 +144,5 @@ void loop() {
   }else{
     // 未蒐集資料時, 內建指示燈不亮
     digitalWrite(LED_BUILTIN, LED_OFF);
-
-    // 下次蒐集特徵資料時, 要重新蒐集
-    collectFinishedCond = 0;
-    sensorArrayIndex = 0;
   }
 }
