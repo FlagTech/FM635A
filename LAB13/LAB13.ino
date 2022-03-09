@@ -35,6 +35,12 @@ Flag_Switch btnMode(NEXT_PIN_NUM, INPUT);
 Flag_Switch btnConfrim(PREV_PIN_NUM, INPUT);
 Flag_HX711 hx711(16, 17);  //sck pin, dout pin
 
+// 連網會用到的參數
+WiFiClientSecure client;  
+const char* ssid = "Xperia XZ Premium_db49";
+const char* password = "12345678";
+const char* SERVER = "ifttt.com";
+
 // 資料預處理會用到的參數
 float mean;
 float sd;
