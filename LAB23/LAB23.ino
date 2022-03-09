@@ -1,13 +1,11 @@
 /*
-  雲端門禁推播系統 -- IFTTT
+  手勢解鎖門禁
 */
-#include "./inc/ifttt.h"
 #include <Flag_DataReader.h>
 #include <Flag_Model.h>
 #include <Flag_MPU6050.h>
 #include <Flag_Switch.h>
 #include <ESP32_Servo.h>
-#include <WiFiClientSecure.h>
 
 #define LED_ON  0
 #define LED_OFF 1
@@ -39,12 +37,6 @@ Flag_Switch lockBtn(LOCK_BTN_PIN, INPUT);
 // 伺服馬達物件
 Servo servo;
 
-// 連網會用到的參數
-WiFiClientSecure client;  
-const char* ssid = "Xperia XZ Premium_db49";
-const char* password = "12345678";
-const char* SERVER = "ifttt.com";
-
 // 資料預處理會用到的參數
 float mean;
 float sd;
@@ -55,36 +47,6 @@ uint32_t sensorArrayIndex = 0;
 uint32_t collectFinishedCond = 0;
 uint32_t lastMeaureTime = 0;
 //--------------------------------
-
-// IFTTT通知LINE
-void notify(){
-  Serial.println("\n開始連接伺服器…");
-  if(!client.connect(SERVER, 443)){
-    Serial.println("連線失敗～");
-  }else{
-    Serial.println("連線成功！");
-    String https_get = "GET https://maker.ifttt.com/trigger/https_test/with/key/dg9J7YHL0mMuDaaRGs9pNU HTTP/1.1\n"\
-                       "Host: " + String(SERVER) + "\n" +\
-                       "Connection: close\n\n";
-                       
-    client.print(https_get);
-
-    while(client.connected()){
-      String line = client.readStringUntil('\n');
-      if (line == "\r") {
-        Serial.println("收到HTTPS回應：");
-        break;
-      }
-    }
-    // 接收並顯示伺服器的回應
-    while(client.available()){
-      char c = client.read();
-      if(c != 0xFF) Serial.print(c);
-      if(c == 0xFF) Serial.println();
-    }
-    client.stop();
-  }
-}
 
 // 檢查密碼 : 213
 uint8_t pwdCheck(uint8_t gesture, float threshold){
@@ -105,7 +67,6 @@ uint8_t pwdCheck(uint8_t gesture, float threshold){
   switch(state){
     case FIRST_WORD:
       if(gesture == 2 && threshold >= THRESHOLD_VAL) {
-        Serial.println();
         Serial.print(2);
         state++;
         return 1; 
@@ -131,7 +92,6 @@ uint8_t pwdCheck(uint8_t gesture, float threshold){
         Serial.println(3);
         Serial.println("解鎖成功");
         servo.write(UNLOCK);
-        notify();
         state = FIRST_WORD;
         return 1;
       }else{     
@@ -142,65 +102,6 @@ uint8_t pwdCheck(uint8_t gesture, float threshold){
 
     default:
       state = FIRST_WORD; 
-      return 0;
-  }
-}
-
-// 檢查密碼 : 閃電 圓形 三角形
-uint8_t pwdCheck2(uint8_t gesture, float threshold){
-  // 信心度的臨界值
-  #define THRESHOLD_VAL 0.75
-
-  // 狀態
-  enum{
-    FIRST_SHAPE,
-    SECOND_SHAPE,
-    THIRD_SHAPE
-  };
-
-  // 狀態變數
-  static uint8_t state = FIRST_SHAPE;
-
-  // 狀態機
-  switch(state){
-    case FIRST_SHAPE:
-      if(gesture == 5 && threshold >=  THRESHOLD_VAL) {
-        Serial.print("\n閃電 ");
-        state++;
-        return 1; 
-      }else{          
-        state = FIRST_SHAPE;
-        return 0; 
-      }  
-      break;
-
-    case SECOND_SHAPE:
-      if(gesture == 4 && threshold >=  THRESHOLD_VAL) {
-        Serial.print("圓形 ");
-        state++;
-        return 1; 
-      }else{            
-        state = FIRST_SHAPE;
-        return 0; 
-      }  
-      break;
-
-    case THIRD_SHAPE:
-      if(gesture == 6 && threshold >=  THRESHOLD_VAL) {
-        Serial.println("三角形");
-        Serial.println("解鎖成功");
-        servo.write(UNLOCK);
-        notify();
-        state = FIRST_SHAPE;
-        return 1;
-      }else{     
-        state = FIRST_SHAPE;  
-        return 0;     
-      } 
-      break;
-
-    default:
-      state = FIRST_SHAPE; 
       return 0;
   }
 }
@@ -220,21 +121,8 @@ void setup() {
   // Servo設置
   servo.attach(SERVO_PIN, 500, 2400); // 設定伺服馬達的接腳
 
-  // Wi-Fi設置
-  WiFi.begin(ssid, password);
-  while (WiFi.status() != WL_CONNECTED) {
-    Serial.print(".");
-    delay(500);
-  }
-
-  Serial.print("\n成功連上基地台!\nIP位址：");
-  Serial.println(WiFi.localIP());
-
-  // 設置CA憑證  
-  client.setCACert(root_ca);
-
   // 多元分類類型的資料讀取
-  data = reader.read("/dataset/one.txt,/dataset/two.txt,/dataset/three.txt,/dataset/circle.txt,/dataset/flash.txt,/dataset/triangle.txt", reader.MODE_CATEGORICAL); //注意讀檔案順序分別對應到one-hot encoding
+  data = reader.read("/dataset/one.txt,/dataset/two.txt,/dataset/three.txt", reader.MODE_CATEGORICAL); //注意讀檔案順序分別對應到one-hot encoding
 
   // 取得特徵資料的平均值
   mean = data->featureMean;
@@ -281,10 +169,10 @@ void loop() {
 
         // 找到機率最大的索引值
         uint8_t indexOfMaxArg = model.argmax(predictVal);
+        
+        // 手寫密碼確認
         uint8_t gesture = indexOfMaxArg + 1;
-        if((!pwdCheck(gesture, predictVal[indexOfMaxArg])) && 
-           (!pwdCheck2(gesture, predictVal[indexOfMaxArg])))
-        {
+        if(!pwdCheck(gesture, predictVal[indexOfMaxArg])){
           Serial.println("\n輸入密碼錯誤"); 
         }
 

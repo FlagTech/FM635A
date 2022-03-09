@@ -1,17 +1,24 @@
 /*
-  讀取ADC值
+  讀取按鈕開關狀態
 */
-#define BITS 10
+#include <Flag_Switch.h>
+
+#define LED_ON  0
+#define LED_OFF 1
+#define INPUT_PIN_NUM 39
+
+Flag_Switch btn(INPUT_PIN_NUM, INPUT);
 
 void setup() {
+  // UART設置
   Serial.begin(115200);
 
-  analogSetAttenuation(ADC_11db); // 衰減11db, 目的是可以量測到3.3v的輸入電壓
-  analogSetWidth(BITS);           // 10位元解析度
+  // GPIO設置
+  pinMode(LED_BUILTIN, OUTPUT);
+  digitalWrite(LED_BUILTIN, LED_OFF);
 }
 
 void loop() {
-  uint16_t adc = analogRead(A0);  // 讀取A0腳的類比值
-  Serial.printf("A0讀到的值：%u\n", adc);
-  delay(1000);
+  if(btn.read())  digitalWrite(LED_BUILTIN, LED_ON);
+  else            digitalWrite(LED_BUILTIN, LED_OFF);
 }

@@ -1,38 +1,76 @@
 /*
-  OLED模組顯示中英文字
+  電子料理秤 -- 即時預測
 */
-#include "./inc/myFont.h"
-#include <Wire.h>
-#include <Adafruit_GFX.h>
-#include <Adafruit_SSD1306.h>
+#include <Flag_DataReader.h>
+#include <Flag_Model.h>
+#include <Flag_HX711.h>
 
-#define SCREEN_WIDTH 128
-#define SCREEN_HIGHT 64
-#define OLED_RESET -1
+// ------------全域變數------------
+// 讀取資料的物件
+Flag_DataReader reader;
+Flag_DataBuffer *data;
 
-Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HIGHT, &Wire, OLED_RESET);
+// 神經網路模型
+Flag_Model model; 
 
-void setup(){
+// 感測器的物件
+Flag_HX711 hx711(16, 17); 
+
+// 資料預處理會用到的參數
+float mean;
+float sd;
+float labelMaxAbs;
+// -------------------------------
+
+void setup() {
+  // UART config
   Serial.begin(115200);
 
-  if(display.begin(SSD1306_SWITCHCAPVCC,0x3C)){
-    display.clearDisplay();
-    display.setTextSize(2);
-    display.setCursor(18,0);
-    display.setTextColor(WHITE,BLACK);
-    display.drawBitmap(0,0,str_1,16,16,WHITE);   //用
-    display.println("ESP32");                    //ESP32
-    display.drawBitmap(80,0,str_4,16,16,WHITE);  //學
-    display.drawBitmap(0,16,str_2,16,16,WHITE);  //機
-    display.drawBitmap(16,16,str_3,16,16,WHITE); //器
-    display.drawBitmap(32,16,str_4,16,16,WHITE); //學
-    display.drawBitmap(48,16,str_5,16,16,WHITE); //習
-    display.setCursor(0,0);
-    display.display();
-  }else{
-    Serial.println("OLED初始化失敗, 請重置~");
-    while(1);
-  }
+  // hx711設置
+  hx711.tare();  // 歸零調整, 取得offset平均值
+  Serial.print("offset : ");
+  Serial.println(hx711.getOffset());
+
+  // 回歸類型的資料讀取
+  data = reader.read("/dataset/weight.txt", reader.MODE_REGRESSION);
+
+  // 取得特徵資料的平均值
+  mean = data->featureMean;
+
+  // 取得特徵資料的標準差
+  sd = data->featureSd;
+
+  // 取得標籤資料的最大絕對值
+  labelMaxAbs = data->labelMaxAbs; 
+        
+  Serial.println(F("----- 即時預測重量 -----"));
+  Serial.println();
+
+  // -------------------------- 建構模型 --------------------------
+  // 讀取已訓練的模型檔
+  model.begin("/weight_model.json");
 }
 
-void loop(){}
+void loop() {
+  // -------------------------- 即時預測 --------------------------
+  // 使用訓練好的模型來預測
+  float test_feature_data;  
+  uint16_t test_feature_shape[] = {1, data->featureDim}; 
+  aitensor_t test_feature_tensor = AITENSOR_2D_F32(test_feature_shape, &test_feature_data);
+  aitensor_t *test_output_tensor;
+  float predictVal;
+
+  while(1){
+    // 測試資料預處理
+    test_feature_data = (hx711.getWeight() - mean) / sd;
+
+    // 模型預測
+    test_output_tensor = model.predict(&test_feature_tensor); 
+
+    // 輸出預測結果
+    Serial.print("重量: ");
+    model.getResult(test_output_tensor, labelMaxAbs, &predictVal);  //因為標籤資料有經過正規化, 所以要將label的比例還原回來
+    Serial.print(predictVal); 
+    Serial.println('g');
+  }
+}

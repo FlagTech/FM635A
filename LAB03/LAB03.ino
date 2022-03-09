@@ -1,29 +1,20 @@
 /*
-  PWM功能
+  讀取ADC值
 */
 #define BITS 10
-#define INVERT(x) ((1 << BITS) - 1 - x)
-#define DUTY(x)   ((int)((x / 100.0) * ((1 << BITS) - 1)))
+#define INPUT_PIN_NUM 39
 
 void setup() {
-  pinMode(LED_BUILTIN, OUTPUT);
-  
-  // 設定PWM，通道0、5KHz、10位元
-  ledcSetup(0, 5000, BITS);        
+  // UART設置
+  Serial.begin(115200);
 
-  // 指定內建的LED接腳成PWM輸出
-  ledcAttachPin(LED_BUILTIN, 0);   
+  // ADC設置
+  analogSetAttenuation(ADC_11db); // 衰減11db, 目的是可以量測到3.3v的輸入電壓
+  analogSetWidth(BITS);           // 10位元解析度
 }
 
 void loop() {
-  // Duty cycle於0% ~ 50%往復調整
-  for(int i = DUTY(0); i < DUTY(50); i++){
-    ledcWrite(0, INVERT(i)); // 內建的LED接腳為LOW致動, 所以須將電壓反向
-    delay(2);
-  }
-
-  for(int i = DUTY(50); i > DUTY(0); i--){
-    ledcWrite(0, INVERT(i)); // 內建的LED接腳為LOW致動, 所以須將電壓反向
-    delay(2);
-  }
+  uint16_t adc = analogRead(A0);  // 讀取A0腳的類比值
+  Serial.printf("A0讀到的值：%u\n", adc);
+  delay(1000);
 }

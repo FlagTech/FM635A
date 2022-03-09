@@ -2,6 +2,7 @@
   閃爍LED
 */
 void setup() {
+  // GPIO設置
   pinMode(LED_BUILTIN, OUTPUT);
 }
 

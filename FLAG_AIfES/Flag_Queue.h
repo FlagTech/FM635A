@@ -3,17 +3,21 @@
 
 class Flag_Queue{
   public:
-    uint16_t buf[40];
+    int32_t buf[10];
     uint32_t in;
     uint32_t out;
 
-    Queue(){
+    Flag_Queue(){
       memset(buf,0,sizeof(buf));
       in = 0;
       out = 0;
     }
 
-    uint8_t push(uint16_t data){
+    uint32_t getBufSize(){
+      return sizeof(buf) / sizeof(buf[0]); 
+    }
+
+    uint8_t push(int32_t data){
       if(isFull()){
         return false;
       }else{
@@ -24,9 +28,9 @@ class Flag_Queue{
       }
     }
 
-    void push_force(uint16_t data){
+    void push_force(int32_t data){
       if(isFull()){
-        uint16_t tmp;
+        int32_t tmp;
         pop(&tmp);
       }
       buf[in] = data;
@@ -34,7 +38,7 @@ class Flag_Queue{
       in %= (sizeof(buf)/sizeof(buf[0]));
     }
 
-    uint8_t pop(uint16_t *data){
+    uint8_t pop(int32_t *data){
       if(isEmpty()){
           return false;
       }else{
@@ -55,13 +59,13 @@ class Flag_Queue{
       else                                             return false;
     }
 
-    uint16_t avg(){
-      uint32_t sum = 0;
+    float avg(){
+      float sum = 0;
       for(int i = 0; i<sizeof(buf)/sizeof(buf[0]); i++){
         sum += buf[i];
       }
       sum /= sizeof(buf)/sizeof(buf[0]);
-      return (uint16_t) sum;
+      return sum;
     }
 };
 
