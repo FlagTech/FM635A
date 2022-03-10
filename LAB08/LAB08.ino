@@ -5,6 +5,9 @@
 #include <Flag_Model.h>
 #include <Flag_HX711.h>
 
+#define HX711_DT_PIN_NUM 33
+#define HX711_SCK_PIN_NUM 32
+
 // ------------全域變數------------
 // 讀取資料的物件
 Flag_DataReader reader;
@@ -14,7 +17,7 @@ Flag_DataBuffer *data;
 Flag_Model model; 
 
 // 感測器的物件
-Flag_HX711 hx711(16, 17); 
+Flag_HX711 hx711(HX711_SCK_PIN_NUM, HX711_DT_PIN_NUM);
 
 // 訓練用的特徵資料
 float *train_feature_data;
@@ -33,6 +36,7 @@ void setup() {
   Serial.begin(115200);
 
   // hx711設置
+  hx711.begin();
   hx711.tare();  // 歸零調整, 取得offset平均值
   Serial.print("offset : ");
   Serial.println(hx711.getOffset());
@@ -78,7 +82,7 @@ void setup() {
   modelPara.layerSize = FLAG_MODEL_GET_LAYER_SIZE(nnStructure);                    
   modelPara.layerSeq = nnStructure;
   modelPara.lossFuncType  = model.LOSS_FUNC_MSE;
-  modelPara.optimizerPara = {.optimizerType = model.OPTIMIZER_ADAM, .learningRate = 0.001, .epochs = 1000, .batch_size = 10};
+  modelPara.optimizerPara = {.optimizerType = model.OPTIMIZER_ADAM, .learningRate = 0.001, .epochs = 800, .batch_size = 10};
   model.begin(&modelPara);
 
   // -------------------------- 訓練模型 --------------------------

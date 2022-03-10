@@ -16,8 +16,10 @@
 #define SCREEN_HIGHT 64
 #define OLED_RESET -1
 #define PAGE_TOTAL 5
-#define NEXT_PIN_NUM 39
-#define PREV_PIN_NUM 34
+#define MODE_BTN_PIN_NUM 39
+#define COMFIRM_BTN_PIN_NUM 34
+#define HX711_DT_PIN_NUM 33
+#define HX711_SCK_PIN_NUM 32
 
 // ------------全域變數------------
 // 讀取資料的物件
@@ -31,9 +33,9 @@ Flag_Model model;
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HIGHT, &Wire, OLED_RESET);
 
 // 感測器的物件
-Flag_Switch btnMode(NEXT_PIN_NUM, INPUT);
-Flag_Switch btnConfrim(PREV_PIN_NUM, INPUT);
-Flag_HX711 hx711(16, 17);  //sck pin, dout pin
+Flag_Switch btnMode(MODE_BTN_PIN_NUM, INPUT);
+Flag_Switch btnConfrim(COMFIRM_BTN_PIN_NUM, INPUT);
+Flag_HX711 hx711(HX711_SCK_PIN_NUM, HX711_DT_PIN_NUM);
 
 // 連網會用到的參數
 WiFiClientSecure client;  
@@ -107,6 +109,10 @@ void utilities(float weight, float *total){
     if(!btnConfrimPressed) {
       btnConfrimPressed = true;
       *total += weight;
+      // 發通知
+      if(total){
+        notify();
+      }
     }
   }else{
     btnConfrimPressed = false;
@@ -134,11 +140,6 @@ void drawPage1(float weight){
   // 調用小工具
   utilities(weight, &total);
   
-  // 發通知
-  if(total){
-    notify();
-  }
-
   // 將畫面顯示出來
   display.display();    
 }
@@ -163,11 +164,6 @@ void drawPage2(float weight){
  
   // 調用小工具
   utilities(weight, &total);
-
-  // 發通知
-  if(total){
-    notify();
-  }
 
   // 將畫面顯示出來
   display.display();
@@ -194,11 +190,6 @@ void drawPage3(float weight){
   // 調用小工具
   utilities(weight, &total);
 
-  // 發通知
-  if(total){
-    notify();
-  }
-
   // 將畫面顯示出來
   display.display();
 }
@@ -223,11 +214,6 @@ void drawPage4(float weight){
 
   // 調用小工具
   utilities(weight, &total);
-
-  // 發通知
-  if(total){
-    notify();
-  }
 
   // 將畫面顯示出來
   display.display();
@@ -254,11 +240,6 @@ void drawPage5(float weight){
   // 調用小工具
   utilities(weight, &total);
 
-  // 發通知
-  if(total){
-    notify();
-  }
-
   // 將畫面顯示出來
   display.display();
 }
@@ -268,6 +249,7 @@ void setup(){
   Serial.begin(115200);
 
   // hx711設置
+  hx711.begin();
   hx711.tare();  // 歸零調整, 取得offset平均值
   Serial.print("offset : ");
   Serial.println(hx711.getOffset());

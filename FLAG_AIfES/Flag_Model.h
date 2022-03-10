@@ -189,7 +189,7 @@ class Flag_Model {
     void begin(Flag_ModelParameter *para){
       //底下亂樹種子不得在model的constructor做, 會出事
       //重要!!! AIfES 需要隨機權重進行訓練
-      uint16_t randSeed = analogRead(A5); // 這裡的隨機種子是由類比引腳的雜訊產生亂數種子
+      uint16_t randSeed = analogRead(A0); // 這裡的隨機種子是由類比引腳的雜訊產生亂數種子
       srand(randSeed); 
       rand(); // 依據先前所設定的亂數種子來取亂數
       

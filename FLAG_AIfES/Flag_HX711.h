@@ -22,6 +22,9 @@ class Flag_HX711
             DOUT = dout;
             setAmp(amp);
             COEFFICIENT = co;
+        }
+
+        void begin(){    
             pinMode(SCK, OUTPUT);
             pinMode(DOUT, INPUT);
             digitalWrite(SCK, LOW);

@@ -14,8 +14,10 @@
 #define SCREEN_HIGHT 64
 #define OLED_RESET -1
 #define PAGE_TOTAL 5
-#define NEXT_PIN_NUM 39
-#define PREV_PIN_NUM 34
+#define MODE_BTN_PIN_NUM 39
+#define COMFIRM_BTN_PIN_NUM 34
+#define HX711_DT_PIN_NUM 33
+#define HX711_SCK_PIN_NUM 32
 
 // ------------全域變數------------
 // 讀取資料的物件
@@ -29,9 +31,9 @@ Flag_Model model;
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HIGHT, &Wire, OLED_RESET);
 
 // 感測器的物件
-Flag_Switch btnMode(NEXT_PIN_NUM, INPUT);
-Flag_Switch btnConfrim(PREV_PIN_NUM, INPUT);
-Flag_HX711 hx711(16, 17);  //sck pin, dout pin
+Flag_Switch btnMode(MODE_BTN_PIN_NUM, INPUT);
+Flag_Switch btnConfrim(COMFIRM_BTN_PIN_NUM, INPUT);
+Flag_HX711 hx711(HX711_SCK_PIN_NUM, HX711_DT_PIN_NUM);
 
 // 資料預處理會用到的參數
 float mean;
@@ -200,10 +202,11 @@ void setup(){
   Serial.begin(115200);
 
   // hx711設置
+  hx711.begin();
   hx711.tare();  // 歸零調整, 取得offset平均值
   Serial.print("offset : ");
   Serial.println(hx711.getOffset());
-
+  
   // OLED 初始化
   if(!display.begin(SSD1306_SWITCHCAPVCC,0x3C)){
     Serial.println("OLED初始化失敗, 請重置~");
@@ -267,7 +270,7 @@ void loop(){
   model.getResult(test_output_tensor, labelMaxAbs, &predictVal);  //因為標籤資料有經過正規化, 所以要將label的比例還原回來
   Serial.print(predictVal); 
   Serial.println('g');
- 
+
   switch(currentPage){
     case 1:
       // 全穀雜糧類
