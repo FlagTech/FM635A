@@ -1,3 +1,6 @@
+/*
+  顏色辨識感測器 -- 蒐集訓練資料
+*/
 #include <Wire.h>
 #include <SparkFun_APDS9960.h>
 #include <Flag_DataExporter.h>
@@ -5,9 +8,8 @@
 #define LED_ON  0
 #define LED_OFF 1
 
-// 1個週期(PERIOD)取MPU6050的6個參數(SENSOR_PARA)
-// 每10個週期(PERIOD)為一筆特徵資料
-// 2種分類各取30筆(ROUND)
+// 取APDS9960的3個參數(SENSOR_PARA)為一筆特徵資料
+// 3種分類各取50筆(ROUND)
 #define CLASS_TOTAL 3
 #define ROUND 50
 #define SENSOR_PARA 3
@@ -36,32 +38,31 @@ void setup() {
   if(apds.init()) Serial.println(F("APDS-9960 初始化完成"));
   else            Serial.println(F("APDS-9960 初始化錯誤"));
   
-  // 啟用APDS-9960光傳感器（無中斷）
-  if(apds.enableLightSensor(false)) Serial.println(F("光傳感器現在正在運行"));
+  // 啟用APDS-9960光傳感器
+  if(apds.enableLightSensor(false)) Serial.println(F("光傳感器正在運行"));
   else                              Serial.println(F("光傳感器初始化錯誤"));
   
   // 調整接近傳感器增益
   if(!apds.setProximityGain(PGAIN_2X)) Serial.println(F("設置 PGAIN 時出現問題"));
   
-  // 啟用APDS-9960接近傳感器（無中斷）
-  if(apds.enableProximitySensor(false)) Serial.println(F("接近傳感器現在正在運行"));
+  // 啟用APDS-9960接近傳感器
+  if(apds.enableProximitySensor(false)) Serial.println(F("接近傳感器正在運行"));
   else                                  Serial.println(F("傳感器初始化錯誤"));
   
   // GPIO設置
   pinMode(LED_BUILTIN, OUTPUT);
   digitalWrite(LED_BUILTIN, LED_OFF);
 
-  Serial.println(F("----- 顏色資料蒐集 -----"));
+  Serial.println(F("---蒐集顏色辨識的特徵資料與標籤資料---"));
   Serial.println();
 }
 
 void loop(){
-  // 偵測是否要開始蒐集資料
   uint8_t proximity_data = 0;
   uint16_t red_light = 0,green_light = 0,blue_light = 0, ambient_light = 0;
-
+  
   if(!apds.readProximity(proximity_data)){
-    Serial.println("Error reading proximity value");
+    Serial.println("此次讀取接近值錯誤");
   }
 
   // 當開始蒐集資料的條件達成時, 開始蒐集
@@ -81,6 +82,7 @@ void loop(){
       float redRatio = 0;
       float greenRatio = 0;
       float blueRatio = 0;
+      
       // 偵測顏色會用到的參數
       if(sum != 0){
         redRatio = red_light / sum;
@@ -108,8 +110,8 @@ void loop(){
           Serial.print("物件"); Serial.print(i); Serial.println("顏色取樣完成");   
           Serial.println("請在5秒內換移開本次採樣的物件"); 
           collectFinishedCond = 0;
-          for(int q = 0; q<5; q++){
-            Serial.println(5-q);
+          for(int q = 0; q < 5; q++){
+            Serial.println(5 - q);
             delay(1000);
           }
           showStageInfo = false;

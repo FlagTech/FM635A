@@ -1,7 +1,6 @@
 0. ESP32 SDK for Arduino
 1. AIfES for Arduino
-2. HX711
+2. FLAG_AIfES
 3. Adafruit_GFX
 4. Adafruit_SSD1306
-5. FM635A_Lib
-6. ESP32Servo
+5. ESP32Servo

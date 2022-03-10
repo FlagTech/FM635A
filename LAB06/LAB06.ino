@@ -17,7 +17,7 @@ void setup() {
 
   // hx711設置
   hx711.begin();
-  hx711.tare();  // 歸零調整, 取得offset平均值
+  hx711.tare();  // 歸零調整
   Serial.print("offset : ");
   Serial.println(hx711.getOffset());
 }

@@ -20,23 +20,20 @@ void setup() {
   if(apds.init()) Serial.println(F("APDS-9960 初始化完成"));
   else            Serial.println(F("APDS-9960 初始化錯誤"));
   
-  // 啟用APDS-9960光傳感器（無中斷）
-  if(apds.enableLightSensor(false)) Serial.println(F("光傳感器現在正在運行"));
+  // 啟用APDS-9960光傳感器
+  if(apds.enableLightSensor(false)) Serial.println(F("光傳感器正在運行"));
   else                              Serial.println(F("光傳感器初始化錯誤"));
   
   // 調整接近傳感器增益
   if(!apds.setProximityGain(PGAIN_2X)) Serial.println(F("設置 PGAIN 時出現問題"));
   
-  // 啟用APDS-9960接近傳感器（無中斷）
-  if(apds.enableProximitySensor(false)) Serial.println(F("接近傳感器現在正在運行"));
+  // 啟用APDS-9960接近傳感器
+  if(apds.enableProximitySensor(false)) Serial.println(F("接近傳感器正在運行"));
   else                                  Serial.println(F("傳感器初始化錯誤"));
   
   // GPIO設置
   pinMode(LED_BUILTIN, OUTPUT);
   digitalWrite(LED_BUILTIN, LED_OFF);
-
-  Serial.println(F("----- 色彩與手勢偵測感測器 -----"));
-  Serial.println();
 }
 
 void loop(){
@@ -45,7 +42,7 @@ void loop(){
 
   // 接近測試
   if(!apds.readProximity(proximity_data)){
-    Serial.println("Error reading proximity value");
+    Serial.println("此次讀取接近值錯誤");
   }
 
   // RGB偵測
@@ -73,5 +70,5 @@ void loop(){
     digitalWrite(LED_BUILTIN, LED_OFF);
   }
 
-  delay(500);
+  delay(1000);
 }
