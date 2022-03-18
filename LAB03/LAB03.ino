@@ -1,20 +1,28 @@
 /*
-  讀取ADC值
+  自製電子秤
 */
-#define BITS 10
-#define INPUT_PIN_NUM 39
+#include <Flag_HX711.h>
+
+// ------------全域變數------------
+// 感測器的物件
+Flag_HX711 hx711(32, 33); //sck, dt
+// -------------------------------
 
 void setup() {
   // UART設置
   Serial.begin(115200);
 
-  // ADC設置
-  analogSetAttenuation(ADC_11db); // 衰減11db, 目的是可以量測到3.3v的輸入電壓
-  analogSetWidth(BITS);           // 10位元解析度
+  // hx711設置
+  hx711.begin();
+  hx711.tare();  // 歸零調整
+  Serial.print("offset : ");
+  Serial.println(hx711.getOffset());
 }
 
 void loop() {
-  uint16_t adc = analogRead(A0);  // 讀取A0腳的類比值
-  Serial.printf("A0讀到的值：%u\n", adc);
-  delay(1000);
+  // 顯示重量
+  float weight = hx711.getWeight();
+  Serial.print("重量: "); 
+  Serial.print(weight, 1); 
+  Serial.println('g');
 }

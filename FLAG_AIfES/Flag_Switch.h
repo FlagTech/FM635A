@@ -5,11 +5,11 @@
 
 class Flag_Switch {
   public:
-    Flag_Switch(uint8_t pinNum, uint8_t type){
+    Flag_Switch(uint8_t pinNum, uint8_t type = INPUT){
       _stableTime = 20;
       _pinNum = pinNum;
       pinMode(_pinNum, type);
-      _lastStableState = _triggerEdge = digitalRead(_pinNum);
+      _lastStableState = _triggerLevel = digitalRead(_pinNum);
       _detectFirst = 1;
     }
 
@@ -21,15 +21,15 @@ class Flag_Switch {
         // 重置計算穩定時間的計時器
         _detectFirst = 0;
         _lastTime = millis();
-        _triggerEdge = reading; 
-        return _triggerEdge; 
+        _triggerLevel = reading; 
+        return _triggerLevel; 
       }else{
         if ((millis() - _lastTime) > _stableTime){
           _detectFirst = 1;
           _lastStableState = reading; //更新穩定值
           return _lastStableState;    //開關已穩定而不彈跳, 回傳讀到的按鈕輸入值
         } else {
-          return _triggerEdge;
+          return _triggerLevel;
         }
       }
     }
@@ -37,7 +37,7 @@ class Flag_Switch {
   private:
     uint8_t _pinNum = 0;
     uint32_t _lastTime = 0;
-    uint8_t _triggerEdge = 0;
+    uint8_t _triggerLevel = 0;
     uint8_t _lastStableState = 0;
     uint8_t _stableTime = 0;
     uint8_t _detectFirst = 1;

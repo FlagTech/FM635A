@@ -1,80 +1,153 @@
 /*
-  電子料理秤 -- 即時預測
+  電子相框
 */
-#include <Flag_DataReader.h>
-#include <Flag_Model.h>
-#include <Flag_HX711.h>
+#include "./inc/bitmap.h"
+#include <Wire.h>
+#include <Adafruit_GFX.h>
+#include <Adafruit_SSD1306.h>
+#include <Flag_Switch.h>
 
-#define HX711_DT_PIN_NUM 33
-#define HX711_SCK_PIN_NUM 32
+#define SCREEN_WIDTH 128
+#define SCREEN_HIGHT 64
+#define OLED_RESET -1
+#define PAGE_TOTAL 3
+#define NEXT_PIN_NUM 39
+#define PREV_PIN_NUM 34
 
 // ------------全域變數------------
-// 讀取資料的物件
-Flag_DataReader reader;
-Flag_DataBuffer *data;
-
-// 神經網路模型
-Flag_Model model; 
+// OLED物件
+Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HIGHT, &Wire, OLED_RESET);
 
 // 感測器的物件
-Flag_HX711 hx711(HX711_SCK_PIN_NUM, HX711_DT_PIN_NUM);
+Flag_Switch nextBtn(NEXT_PIN_NUM, INPUT);
+Flag_Switch prevBtn(PREV_PIN_NUM, INPUT);
 
-// 資料預處理會用到的參數
-float mean;
-float sd;
-float labelMaxAbs;
+// UI會用到的參數
+uint8_t currentPage;
+bool btnNextPressed;
+bool btnPrevPressed;
 // -------------------------------
+  
+//------第1頁------
+void drawPage1(){
+  display.clearDisplay();
 
-void setup() {
-  // UART config
-  Serial.begin(115200);
+  // 設定各元件參數
+  // 第1頁的橫幅背景 
+  display.drawBitmap(0,0,bitmap_banner_background,128,16,WHITE);  
+  
+  // 第1頁的橫幅文字
+  display.setTextSize(2);
+  display.setCursor(35,0);
+  display.setTextColor(BLACK,WHITE);
+  display.println("Flash");
 
-  // hx711設置
-  hx711.begin();
-  hx711.tare();  // 歸零調整
-  Serial.print("offset : ");
-  Serial.println(hx711.getOffset());
+  // 第1頁的右鍵
+  display.drawBitmap(112,26,bitmap_right_btn,16,27,WHITE); 
 
-  // 回歸類型的資料讀取
-  data = reader.read("/dataset/weight.txt", reader.MODE_REGRESSION);
+  // 第1頁的照片
+  display.drawBitmap(42,18,bitmap_flash,44,44,WHITE);  
 
-  // 取得特徵資料的平均值
-  mean = data->featureMean;
-
-  // 取得特徵資料的標準差
-  sd = data->featureSd;
-
-  // 取得標籤資料的最大絕對值
-  labelMaxAbs = data->labelMaxAbs; 
-        
-  Serial.println(F("----- 即時預測重量 -----"));
-  Serial.println();
-
-  // -------------------------- 建構模型 --------------------------
-  // 讀取已訓練的模型檔
-  model.begin("/weight_model.json");
+  // 將畫面顯示出來
+  display.display();    
 }
 
-void loop() {
-  // -------------------------- 即時預測 --------------------------
-  // 使用訓練好的模型來預測
-  float test_feature_data;  
-  uint16_t test_feature_shape[] = {1, data->featureDim}; 
-  aitensor_t test_feature_tensor = AITENSOR_2D_F32(test_feature_shape, &test_feature_data);
-  aitensor_t *test_output_tensor;
-  float predictVal;
+//------第2頁------
+void drawPage2(){
+  display.clearDisplay();
 
-  while(1){
-    // 測試資料預處理
-    test_feature_data = (hx711.getWeight() - mean) / sd;
+  // 設定各元件參數
+  // 第2頁的橫幅背景 
+  display.drawBitmap(0,0,bitmap_banner_background,128,16,WHITE);  
+  
+  // 第2頁的橫幅文字
+  display.setTextSize(2);
+  display.setCursor(35,0);
+  display.setTextColor(BLACK,WHITE);
+  display.println("Heart");
 
-    // 模型預測
-    test_output_tensor = model.predict(&test_feature_tensor); 
+  // 第2頁的左鍵
+  display.drawBitmap(0,26,bitmap_left_btn,16,27,WHITE); 
 
-    // 輸出預測結果
-    Serial.print("重量: ");
-    model.getResult(test_output_tensor, labelMaxAbs, &predictVal);  //因為標籤資料有經過正規化, 所以要將label的比例還原回來
-    Serial.print(predictVal); 
-    Serial.println('g');
+  // 第2頁的右鍵
+  display.drawBitmap(112,26,bitmap_right_btn,16,27,WHITE); 
+
+  // 第2頁的照片
+  display.drawBitmap(42,18,bitmap_heart,44,44,WHITE); 
+
+  // 將畫面顯示出來
+  display.display();
+}
+
+//------第3頁------
+void drawPage3(){
+  display.clearDisplay();
+
+  // 設定各元件參數
+  // 第3頁的橫幅背景 
+  display.drawBitmap(0,0,bitmap_banner_background,128,16,WHITE);  
+  
+  // 第3頁的橫幅文字
+  display.setTextSize(2);
+  display.setCursor(45,0);
+  display.setTextColor(BLACK,WHITE);
+  display.println("Star");
+
+  // 第3頁的左鍵
+  display.drawBitmap(0,26,bitmap_left_btn,16,27,WHITE); 
+
+  // 第3頁的照片
+  display.drawBitmap(42,18,bitmap_star,44,44,WHITE); 
+
+  // 將畫面顯示出來
+  display.display();
+}
+
+void setup(){
+  Serial.begin(115200);
+
+  if(!display.begin(SSD1306_SWITCHCAPVCC,0x3C)){
+    Serial.println("OLED初始化失敗, 請重置~");
+    while(1);
+  }
+
+  currentPage = 1;
+  btnNextPressed = false;
+  btnPrevPressed = false;
+  drawPage1();
+}
+
+void loop(){
+  // 偵測下一頁按鈕
+  if(nextBtn.read()){
+    if(currentPage < PAGE_TOTAL && !btnNextPressed) {
+      currentPage++;
+      btnNextPressed = true;
+    }
+  }else{
+    btnNextPressed = false;
+  }
+
+  // 偵測上一頁按鈕
+  if(prevBtn.read()){
+    if(currentPage > 1 && !btnPrevPressed) {
+      currentPage--;
+      btnPrevPressed = true;
+    }
+  }else{
+    btnPrevPressed = false;
+  }
+  
+  // 頁面有變更才需要更新畫面
+  switch(currentPage){
+    case 1:
+      drawPage1();
+      break;
+    case 2:
+      drawPage2();
+      break;
+    case 3:
+      drawPage3();
+      break;
   }
 }

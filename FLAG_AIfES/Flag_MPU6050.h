@@ -4,8 +4,6 @@
 #include <Arduino.h>
 #include <Wire.h>
 
-#define DEG_TO_RAD 0.017453293F
-
 class Flag_MPU6050{
   public:
     enum{

@@ -1,193 +1,71 @@
 /*
-  雲端跌倒推播系統--IFTTT
+  手勢記錄 -- 蒐集訓練資料
 */
-#include "./inc/ifttt.h"
-#include <Flag_DataReader.h>
-#include <Flag_Model.h>
 #include <Flag_MPU6050.h>
-#include <WiFiClientSecure.h>
+#include <Flag_Switch.h>
+#include <Flag_DataExporter.h>
 
 #define LED_ON  0
 #define LED_OFF 1
-#define BUZZER_PIN 32
+#define COLLECT_BTN_PIN 39
 
 // 1個週期(PERIOD)取MPU6050的6個參數(SENSOR_PARA)
 // 每10個週期(PERIOD)為一筆特徵資料
+// 3種手勢各取30筆(ROUND)
+#define CLASS_TOTAL 3 
 #define PERIOD 10
+#define ROUND 30
 #define SENSOR_PARA 6
 #define FEATURE_DIM (PERIOD * SENSOR_PARA)
+#define FEATURE_LEN (FEATURE_DIM * ROUND * CLASS_TOTAL)
 
 //------------全域變數------------
-// 讀取資料的物件
-Flag_DataReader reader;
-Flag_DataBuffer *data;
-
-// 神經網路模型
-Flag_Model model; 
-
 // 感測器的物件
 Flag_MPU6050 mpu6050;
+Flag_Switch collectBtn(COLLECT_BTN_PIN, INPUT);
 
-// 連網會用到的參數
-WiFiClientSecure client;  
-const char* ssid = "Xperia XZ Premium_db49";
-const char* password = "12345678";
-const char* SERVER = "ifttt.com";
+// 匯出蒐集資料會用的物件
+Flag_DataExporter exporter;
 
-// 資料預處理會用到的參數
-float mean;
-float sd;
-
-// 評估模型會用到的參數
-float sensorData[FEATURE_DIM];
-uint32_t sensorArrayIndex = 0;
+// 蒐集資料會用到的參數
+float sensorData[FEATURE_LEN]; 
+uint32_t sensorArrayIndex = 0, lastArrayIndex = 0;
 uint32_t collectFinishedCond = 0;
 uint32_t lastMeaureTime = 0;
-bool collect = false;
+bool showStageInfo = false;
 //--------------------------------
 
-// IFTTT通知LINE
-void notify(){
-  Serial.println("\n開始連接伺服器…");
-  if(!client.connect(SERVER, 443)){
-    Serial.println("連線失敗～");
-  }else{
-    Serial.println("連線成功！");
-    String https_get = "GET https://maker.ifttt.com/trigger/https_test/with/key/dg9J7YHL0mMuDaaRGs9pNU HTTP/1.1\n"\
-                       "Host: " + String(SERVER) + "\n" +\
-                       "Connection: close\n\n";
-                       
-    client.print(https_get);
-
-    while(client.connected()){
-      String line = client.readStringUntil('\n');
-      if (line == "\r") {
-        Serial.println("收到HTTPS回應：");
-        break;
-      }
-    }
-    // 接收並顯示伺服器的回應
-    while(client.available()){
-      char c = client.read();
-      if(c != 0xFF) Serial.print(c);
-      if(c == 0xFF) Serial.println();
-    }
-    client.stop();
-  }
-}
-
-void setup() {
+void setup(){
   // UART設置
   Serial.begin(115200);
-
+  
   // mpu6050設置
   mpu6050.init();
-  while(!mpu6050.isReady()); 
+  while(!mpu6050.isReady());
 
   // GPIO設置
-  pinMode(BUZZER_PIN, OUTPUT);
   pinMode(LED_BUILTIN, OUTPUT);
   digitalWrite(LED_BUILTIN, LED_OFF);
-  digitalWrite(BUZZER_PIN, LOW);
 
-  // Wi-Fi設置
-  WiFi.begin(ssid, password);
-  while (WiFi.status() != WL_CONNECTED) {
-    Serial.print(".");
-    delay(500);
-  }
-
-  Serial.print("\n成功連上基地台!\nIP位址：");
-  Serial.println(WiFi.localIP());
-
-  // 設置CA憑證  
-  client.setCACert(root_ca);
-
-  // 2元分類類型的資料讀取
-  data = reader.read("/dataset/others.txt,/dataset/fall.txt", reader.MODE_BINARY); //注意讀檔案順序分別對應到one-hot encoding
-
-  // 取得特徵資料的平均值
-  mean = data->featureMean;
-
-  // 取得特徵資料的標準差
-  sd = data->featureSd;
-        
-  Serial.println(F("----- 即時預測跌倒姿勢 -----"));
+  Serial.println(F("----- 手勢資料蒐集 -----"));
   Serial.println();
-
-  // -------------------------- 建構模型 --------------------------
-  // 讀取已訓練的模型檔
-  model.begin("/fall_model.json");
 }
 
-void loop() {
-  // -------------------------- 即時預測 --------------------------
-  // 偵測是否要開始蒐集資料
-  if(millis() - lastMeaureTime > 100 && !collect){
-    //mpu6050資料更新  
-    mpu6050.update();
-
-    // 開始蒐集資料的條件
-    if(mpu6050.data.accY > -0.75){
-      collect = true;
-    }
-    lastMeaureTime = millis();
-  }
-
- // 當開始蒐集資料的條件達成時, 開始蒐集
-  if(collect){
+void loop(){
+  // 當按鈕按下時開始蒐集資料   
+  if(collectBtn.read()){
     // 蒐集資料時, 內建指示燈會亮
     digitalWrite(LED_BUILTIN, LED_ON);
-
+  
     // 100ms為一個週期來取一次mpu6050資料, 連續取10個週期作為一筆特徵資料, 也就是一秒會取到一筆特徵資料
     if(millis() - lastMeaureTime > 100){
-      //mpu6050資料更新  
+      // mpu6050資料更新  
       mpu6050.update();
 
       if(collectFinishedCond == PERIOD){
-        // 取得一筆特徵資料, 並使用訓練好的模型來預測以進行評估
-        float *test_feature_data = sensorData; 
-        uint16_t test_feature_shape[] = {1, FEATURE_DIM};
-        aitensor_t test_feature_tensor = AITENSOR_2D_F32(test_feature_shape, test_feature_data);
-        aitensor_t *test_output_tensor;
-        float predictVal;
-
-        // 測試資料預處理
-        for(int i = 0; i < FEATURE_DIM ; i++){
-          test_feature_data[i] = (test_feature_data[i] - mean) / sd;
-        }
-
-        // 模型預測
-        test_output_tensor = model.predict(&test_feature_tensor);
-        model.getResult(test_output_tensor, &predictVal);
-        
-        // 輸出預測結果
-        Serial.print(F("預測值: "));
-        model.printResult(&predictVal);
-  
-        // 若為跌倒, 發出警示聲
-        if(predictVal >= 0.85) {
-          Serial.println("已跌倒");
-          
-          // Line通知
-          notify();
-
-          // 發出警示聲
-          for(int i = 0; i < 5; i++){
-            digitalWrite(BUZZER_PIN, HIGH);
-            delay(500);
-            digitalWrite(BUZZER_PIN, LOW);
-            delay(500);
-          }
-        }else{
-          Serial.println("未跌倒");
-        }
-
-        // 下次蒐集特徵資料時, 要重新蒐集
-        sensorArrayIndex = 0;
-        collectFinishedCond = 0;
-        collect = false;
-        
+        // 取得一筆特徵資料
+        Serial.println("此筆資料蒐集已完成, 可以放開按鈕進行下一筆資料蒐集~");
+        showStageInfo = true;
       }else{
         sensorData[sensorArrayIndex] = mpu6050.data.accX; sensorArrayIndex++;
         sensorData[sensorArrayIndex] = mpu6050.data.accY; sensorArrayIndex++;
@@ -202,5 +80,29 @@ void loop() {
   }else{
     // 未蒐集資料時, 內建指示燈不亮
     digitalWrite(LED_BUILTIN, LED_OFF);
-  }
+    
+    // 按鈕放開, 則代表特徵資料要重新蒐集
+    collectFinishedCond = 0;
+    
+    // 若中途手放開按鈕, 則不足以形成一筆特徵資料
+    if(sensorArrayIndex % FEATURE_DIM != 0) sensorArrayIndex = lastArrayIndex;
+    else                                    lastArrayIndex   = sensorArrayIndex;
+
+    // 每一個階段都會提示該階段蒐集完成的訊息, 並且僅顯示一次
+    if(showStageInfo){
+      for(int i = 0; i < CLASS_TOTAL; i++){
+        if(sensorArrayIndex == FEATURE_LEN / CLASS_TOTAL * (i+1)){
+          Serial.print("手勢"); Serial.print(i); Serial.println("取樣完成");
+          showStageInfo = false;
+          if(sensorArrayIndex == FEATURE_LEN){
+            // 匯出特徵資料字串
+            exporter.dataExport(sensorData, FEATURE_DIM, ROUND, CLASS_TOTAL);
+            Serial.println("可以將特徵資料字串複製起來並存成TXT檔, 若需要重新蒐集資料請重置ESP32");
+            while(1);
+          }
+          break;
+        }
+      }
+    }
+  }                    
 }
