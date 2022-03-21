@@ -1,6 +1,6 @@
  /*
   第一個機器學習模型 -- 找出 30-39 歲美國女性的身高與平均體重的關係。
-  --------------------
+  -------------------------------------------------------------
   本範例程式示範在 AIfES 中使用訓練數據來訓練神經網絡。
     -網絡結構為 1-5(relu)-10(relu)-1(relu)。
     -使用 Glorot 初始化權重參數。
@@ -39,15 +39,15 @@ void setup() {
   // 取得訓練標籤資料的最大絕對值
   float sd = trainData->featureSd;
 
-  // 取得標籤資料的最大絕對值
-  float labelMaxAbs = trainData->labelMaxAbs;
-
-  // 訓練特徵資料的正規化: 標準差法
+  // 訓練特徵資料的正規化: 標準化
   for(int j = 0; j < trainData->featureDataArryLen; j++){
     trainData->feature[j] = (trainData->feature[j] - mean) / sd;
   }
 
-  // 訓練標籤資料的正規化: Min/Max 法
+  // 取得標籤資料的最大絕對值
+  float labelMaxAbs = trainData->labelMaxAbs;
+
+  // 訓練標籤資料的正規化: 除以標籤最大值
   for(int j = 0; j < trainData->labelDataArryLen; j++){
     trainData->label[j] /= labelMaxAbs;  
   }
