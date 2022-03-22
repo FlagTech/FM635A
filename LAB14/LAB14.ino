@@ -112,11 +112,13 @@ void loop() {
   // ----------------------------------------- 評估模型 --------------------------
   // 偵測是否要開始蒐集資料
   if(millis() - lastMeaureTime > 100 && !collect){
+    
     // mpu6050資料更新  
     mpu6050.update();
     
     // 開始蒐集資料的條件
     if(mpu6050.data.accY > -0.75){
+      Serial.println(mpu6050.data.accY);
       collect = true;
     }
     lastMeaureTime = millis();
