@@ -83,7 +83,8 @@ void setup() {
   // -------------------------- 建構模型 --------------------------
   Flag_ModelParameter modelPara;
   Flag_LayerSequence nnStructure[] = {{.layerType = model.LAYER_INPUT, .neurons =  0, .activationType = model.ACTIVATION_NONE},     // input layer
-                                      {.layerType = model.LAYER_DENSE, .neurons =  8, .activationType = model.ACTIVATION_RELU},     // hidden layer
+                                      {.layerType = model.LAYER_DENSE, .neurons =  5, .activationType = model.ACTIVATION_RELU},     // hidden layer
+                                      {.layerType = model.LAYER_DENSE, .neurons =  10, .activationType = model.ACTIVATION_RELU},     // hidden layer
                                       {.layerType = model.LAYER_DENSE, .neurons =  1, .activationType = model.ACTIVATION_SIGMOID}}; // output layer
   modelPara.inputLayerPara = FLAG_MODEL_2D_INPUT_LAYER_DIM(data->featureDim);
   modelPara.layerSize = FLAG_MODEL_GET_LAYER_SIZE(nnStructure);
@@ -118,7 +119,6 @@ void loop() {
     
     // 開始蒐集資料的條件
     if(mpu6050.data.accY > -0.75){
-      Serial.println(mpu6050.data.accY);
       collect = true;
     }
     lastMeaureTime = millis();

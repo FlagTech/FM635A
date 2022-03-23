@@ -9,7 +9,7 @@ void setup() {
 
 void loop() {
   digitalWrite(BUZZER_PIN, HIGH);  
-  delay(1000);                       
+  delay(300);                       
   digitalWrite(BUZZER_PIN, LOW);    
   delay(1000);                   
 }

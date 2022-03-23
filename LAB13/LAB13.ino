@@ -5,6 +5,8 @@
 #include <Flag_Switch.h>
 #include <Flag_DataExporter.h>
 
+#define BUZZER_PIN 32
+
 // 1 個週期 (PERIOD) 取 MPU6050 的 6 個參數 (SENSOR_PARA)
 // 每 10 個週期 (PERIOD) 為一筆特徵資料
 // 2 種分類各取 50 筆 (ROUND)
@@ -27,6 +29,7 @@ float sensorData[FEATURE_LEN];
 uint32_t sensorArrayIndex = 0;
 uint32_t collectFinishedCond = 0;
 uint32_t lastMeaureTime = 0;
+uint32_t dataCnt = 0;
 bool collect = false;
 //--------------------------------
 
@@ -39,9 +42,11 @@ void setup(){
   while(!mpu6050.isReady());
 
   // 腳位設置
+  pinMode(BUZZER_PIN, OUTPUT);
+  digitalWrite(BUZZER_PIN, LOW); 
   pinMode(LED_BUILTIN, OUTPUT);
   digitalWrite(LED_BUILTIN, HIGH);
-
+  
   Serial.println(F("----- 跌倒姿勢資料蒐集 -----"));
   Serial.println();
 }
@@ -59,15 +64,24 @@ void loop(){
       // 連續取 10 個週期作為一筆特徵資料, 也就是一秒會取到一筆特徵資料
       if(collectFinishedCond == PERIOD){
         // 取得一筆特徵資料
-        Serial.println("此筆資料蒐集已完成, 可以進行下一筆資料蒐集");
- 
+        dataCnt++;
+        Serial.print("第");
+        Serial.print(dataCnt);
+        Serial.println("筆資料蒐集已完成");
+
+        // 嗶聲
+        digitalWrite(BUZZER_PIN, HIGH);  
+        delay(500);                       
+        digitalWrite(BUZZER_PIN, LOW);  
+
         // 每一種分類資料蒐集完都會提示該階段已蒐集完成的訊息, 並且僅顯示一次
         for(int i = 0; i < 2; i++){
           if(sensorArrayIndex == FEATURE_LEN / 2 * (i+1)){
 
             if(i == 0) Serial.println("非跌倒資料取樣完成");
             else       Serial.println("跌倒資料取樣完成");
-
+            dataCnt = 0;
+            
             if(sensorArrayIndex == FEATURE_LEN){
               // 匯出特徵資料字串
               exporter.dataExport(sensorData, FEATURE_DIM, ROUND, 2);
@@ -106,7 +120,7 @@ void loop(){
     digitalWrite(LED_BUILTIN, HIGH);
 
     if(millis() - lastMeaureTime > 100){
-      // mpu6050 資料更新  
+      // MPU6050 資料更新  
       mpu6050.update();
       
       // 開始蒐集資料的條件
