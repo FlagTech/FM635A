@@ -1,4 +1,4 @@
- /*
+/*
   第一個機器學習模型 -- 找出 30-39 歲美國女性的身高與平均體重的關係。
 */
 #include <Flag_DataReader.h>
@@ -8,6 +8,8 @@
 // 讀取資料的物件
 Flag_DataReader trainDataReader;
 Flag_DataReader testDataReader;
+
+// 指向存放資料的指標
 Flag_DataBuffer *trainData;
 Flag_DataBuffer *testData;
 

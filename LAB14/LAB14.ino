@@ -19,7 +19,7 @@
 //------------全域變數------------
 // 感測器的物件
 Flag_MPU6050 mpu6050;
-Flag_Switch collectBtn(39, INPUT_PULLDOWN);
+Flag_Switch collectBtn(39);
 
 // 匯出蒐集資料會用的物件
 Flag_DataExporter exporter;
@@ -37,7 +37,7 @@ void setup(){
   // 序列埠設置
   Serial.begin(115200);
 
-  // MPU6050設置
+  // MPU6050 設置
   mpu6050.init();
   while(!mpu6050.isReady());
 
@@ -74,7 +74,7 @@ void loop(){
         delay(500);                       
         digitalWrite(BUZZER_PIN, LOW);  
 
-        // 每一種分類資料蒐集完都會提示該階段已蒐集完成的訊息, 並且僅顯示一次
+        // 每一種分類資料蒐集完都會提示該階段已蒐集完成的訊息
         for(int i = 0; i < 2; i++){
           if(sensorArrayIndex == FEATURE_LEN / 2 * (i+1)){
 
@@ -84,9 +84,14 @@ void loop(){
             
             if(sensorArrayIndex == FEATURE_LEN){
               // 匯出特徵資料字串
-              exporter.dataExport(sensorData, FEATURE_DIM, ROUND, 2);
+              exporter.dataExport(
+                sensorData, 
+                FEATURE_DIM, 
+                ROUND, 
+                2
+              );
               Serial.println(
-                "可以將特徵資料字串複製起來並存成txt檔, 若需要重新蒐集資料請重置ESP32"
+                "可以將特徵資料字串複製起來並存成txt檔"
               );
               while(1);
             }

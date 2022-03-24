@@ -6,10 +6,10 @@
 Flag_Switch btn(39);
 
 void setup() {
-  // UART設置
+  // 序列埠設置
   Serial.begin(115200);
 
-  // GPIO設置
+  // 腳位設置
   pinMode(LED_BUILTIN, OUTPUT);
   digitalWrite(LED_BUILTIN, HIGH);
 }
