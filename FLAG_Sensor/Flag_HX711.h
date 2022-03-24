@@ -17,7 +17,7 @@ class Flag_HX711
         Flag_Queue _que;
 
     public:
-        Flag_HX711(uint8_t sck, uint8_t dout, uint8_t amp = 128, float co =  0.0011545){
+        Flag_HX711(uint8_t sck, uint8_t dout, float co = (-4.685310e-4) * 1.06, uint8_t amp = 128){
             SCK = sck;
             DOUT = dout;
             setAmp(amp);
@@ -33,6 +33,10 @@ class Flag_HX711
             for(uint32_t  i = 0; i < _que.getBufSize() * 2; i++){
                 readRawData();
             }
+        }
+
+        void invert(){
+          COEFFICIENT *= -1.0;
         }
 
         void setAmp(uint8_t amp){
@@ -73,7 +77,7 @@ class Flag_HX711
             setOffset(_que.avg());
         }
 
-        void setCoefficient(float co = 0.0011545){
+        void setCoefficient(float co = (-4.685310e-4 *  1.06)){
             COEFFICIENT = co;
         }
 
