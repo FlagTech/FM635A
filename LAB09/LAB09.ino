@@ -3,7 +3,7 @@
 */
 #include "./inc/bitmap.h"
 #include <Wire.h>
-#include <Adafruit_GFX.h>
+//#include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
 #include <Flag_Switch.h>
 
@@ -16,7 +16,12 @@
 
 // ------------全域變數------------
 // OLED物件
-Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HIGHT, &Wire, OLED_RESET);
+Adafruit_SSD1306 display(
+  SCREEN_WIDTH, 
+  SCREEN_HIGHT, 
+  &Wire, 
+  OLED_RESET
+);
 
 // 感測器的物件
 Flag_Switch nextBtn(NEXT_PIN_NUM, INPUT);

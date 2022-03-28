@@ -1,25 +1,24 @@
 /*
-  跌倒姿勢記錄 -- 蒐集訓練資料
+  顏色辨識感測器 -- 蒐集訓練資料
 */
-#include <Flag_MPU6050.h>
-#include <Flag_Switch.h>
+#include <Wire.h>
+#include <SparkFun_APDS9960.h>
 #include <Flag_DataExporter.h>
 
-#define BUZZER_PIN 32
+#define LED_ON  0
+#define LED_OFF 1
 
-// 1 個週期 (PERIOD) 取 MPU6050 的 6 個參數 (SENSOR_PARA)
-// 每 10 個週期 (PERIOD) 為一筆特徵資料
-// 2 種分類各取 50 筆 (ROUND)
-#define SENSOR_PARA 6
-#define PERIOD 10
+// 取APDS9960的3個參數(SENSOR_PARA)為一筆特徵資料
+// 3種分類各取50筆(ROUND)
+#define CLASS_TOTAL 3
 #define ROUND 50
-#define FEATURE_DIM (PERIOD * SENSOR_PARA)
-#define FEATURE_LEN (FEATURE_DIM * ROUND * 2)
+#define SENSOR_PARA 3
+#define FEATURE_DIM SENSOR_PARA
+#define FEATURE_LEN (FEATURE_DIM * ROUND * CLASS_TOTAL)
 
 //------------全域變數------------
 // 感測器的物件
-Flag_MPU6050 mpu6050;
-Flag_Switch collectBtn(39);
+SparkFun_APDS9960 apds = SparkFun_APDS9960();
 
 // 匯出蒐集資料會用的物件
 Flag_DataExporter exporter;
@@ -28,111 +27,103 @@ Flag_DataExporter exporter;
 float sensorData[FEATURE_LEN]; 
 uint32_t sensorArrayIndex = 0;
 uint32_t collectFinishedCond = 0;
-uint32_t lastMeaureTime = 0;
-uint32_t dataCnt = 0;
-bool collect = false;
+bool showStageInfo = false;
 //--------------------------------
 
-void setup(){
-  // 序列埠設置
+void setup() {
+  // UART設置
   Serial.begin(115200);
 
-  // MPU6050 設置
-  mpu6050.init();
-  while(!mpu6050.isReady());
-
-  // 腳位設置
-  pinMode(BUZZER_PIN, OUTPUT);
-  digitalWrite(BUZZER_PIN, LOW); 
-  pinMode(LED_BUILTIN, OUTPUT);
-  digitalWrite(LED_BUILTIN, HIGH);
+  // 初始化APDS9960
+  if(apds.init()) Serial.println(F("APDS-9960 初始化完成"));
+  else            Serial.println(F("APDS-9960 初始化錯誤"));
   
-  Serial.println(F("----- 跌倒姿勢資料蒐集 -----"));
+  // 啟用APDS-9960光傳感器
+  if(apds.enableLightSensor(false)) Serial.println(F("光傳感器正在運行"));
+  else                              Serial.println(F("光傳感器初始化錯誤"));
+  
+  // 調整接近傳感器增益
+  if(!apds.setProximityGain(PGAIN_2X)) Serial.println(F("設置 PGAIN 時出現問題"));
+  
+  // 啟用APDS-9960接近傳感器
+  if(apds.enableProximitySensor(false)) Serial.println(F("接近傳感器正在運行"));
+  else                                  Serial.println(F("傳感器初始化錯誤"));
+  
+  // GPIO設置
+  pinMode(LED_BUILTIN, OUTPUT);
+  digitalWrite(LED_BUILTIN, LED_OFF);
+
+  Serial.println(F("---蒐集顏色辨識的特徵資料與標籤資料---"));
   Serial.println();
 }
 
 void loop(){
-  if(collect) {
+  uint8_t proximity_data = 0;
+  uint16_t red_light = 0,green_light = 0,blue_light = 0, ambient_light = 0;
+  
+  if(!apds.readProximity(proximity_data)){
+    Serial.println("此次讀取接近值錯誤");
+  }
+
+  // 當開始蒐集資料的條件達成時, 開始蒐集
+  if (proximity_data == 255 && collectFinishedCond != ROUND) {
     // 蒐集資料時, 內建指示燈會亮
-    digitalWrite(LED_BUILTIN, LOW);
+    digitalWrite(LED_BUILTIN, LED_ON);
 
-    // 每 100 毫秒為一個週期來取一次 MPU6050 資料
-    if(millis() - lastMeaureTime > 100){
-      // MPU6050 資料更新  
-      mpu6050.update();
-
-      // 連續取 10 個週期作為一筆特徵資料, 也就是一秒會取到一筆特徵資料
-      if(collectFinishedCond == PERIOD){
-        // 取得一筆特徵資料
-        dataCnt++;
-        Serial.print("第");
-        Serial.print(dataCnt);
-        Serial.println("筆資料蒐集已完成");
-
-        // 嗶聲
-        digitalWrite(BUZZER_PIN, HIGH);  
-        delay(500);                       
-        digitalWrite(BUZZER_PIN, LOW);  
-
-        // 每一種分類資料蒐集完都會提示該階段已蒐集完成的訊息
-        for(int i = 0; i < 2; i++){
-          if(sensorArrayIndex == FEATURE_LEN / 2 * (i+1)){
-
-            if(i == 0) Serial.println("非跌倒資料取樣完成");
-            else       Serial.println("跌倒資料取樣完成");
-            dataCnt = 0;
-            
-            if(sensorArrayIndex == FEATURE_LEN){
-              // 匯出特徵資料字串
-              exporter.dataExport(
-                sensorData, 
-                FEATURE_DIM, 
-                ROUND, 
-                2
-              );
-              Serial.println(
-                "可以將特徵資料字串複製起來並存成txt檔"
-              );
-              while(1);
-            }
-            break;
-          }
-        }
-        
-        // 按下按鈕進行下一筆資料收集
-        while(!collectBtn.read());
-        collectFinishedCond = 0;
-        collect = false;
-      }else{
-        sensorData[sensorArrayIndex] = mpu6050.data.accX; 
-        sensorArrayIndex++;
-        sensorData[sensorArrayIndex] = mpu6050.data.accY; 
-        sensorArrayIndex++;
-        sensorData[sensorArrayIndex] = mpu6050.data.accZ; 
-        sensorArrayIndex++;
-        sensorData[sensorArrayIndex] = mpu6050.data.gyrX; 
-        sensorArrayIndex++;
-        sensorData[sensorArrayIndex] = mpu6050.data.gyrY; 
-        sensorArrayIndex++;
-        sensorData[sensorArrayIndex] = mpu6050.data.gyrZ; 
-        sensorArrayIndex++;
-        collectFinishedCond++;
-      }
-      lastMeaureTime = millis();
-    }
-  }else{
-    // 未蒐集資料時, 內建指示燈不亮
-    digitalWrite(LED_BUILTIN, HIGH);
-
-    if(millis() - lastMeaureTime > 100){
-      // MPU6050 資料更新  
-      mpu6050.update();
+    // 偵測是否要開始蒐集資料
+    if(!apds.readAmbientLight(ambient_light)  ||
+       !apds.readRedLight(red_light)          ||
+       !apds.readGreenLight(green_light)      ||
+       !apds.readBlueLight(blue_light)){
+      Serial.println("Error reading light values");
+    }else{
+      // 計算總信號中各種顏色的比例。 它們被標準化為0至1的範圍。
+      float sum = red_light + green_light + blue_light;
+      float redRatio = 0;
+      float greenRatio = 0;
+      float blueRatio = 0;
       
-      // 開始蒐集資料的條件
-      if(mpu6050.data.accY > -0.75){
-        collect = true;
+      // 偵測顏色會用到的參數
+      if(sum != 0){
+        redRatio = red_light / sum;
+        greenRatio = green_light / sum;
+        blueRatio = blue_light / sum;
       }
-      lastMeaureTime = millis();
+     
+      sensorData[sensorArrayIndex] = redRatio;   sensorArrayIndex++;
+      sensorData[sensorArrayIndex] = greenRatio; sensorArrayIndex++;
+      sensorData[sensorArrayIndex] = blueRatio;  sensorArrayIndex++;
+      collectFinishedCond++;
+      delay(500);
+
+      Serial.println("取得一筆資料");
+      if(collectFinishedCond == ROUND) showStageInfo = true;
+    }
+  } else {
+    // 未蒐集資料時, 內建指示燈不亮
+    digitalWrite(LED_BUILTIN, LED_OFF);
+    
+    // 每一個階段都會提示該階段蒐集完成的訊息, 並且僅顯示一次
+    if(showStageInfo){
+      for(int i = 0; i < CLASS_TOTAL; i++){
+        if(sensorArrayIndex == FEATURE_LEN / CLASS_TOTAL * (i+1)){
+          Serial.print("物件"); Serial.print(i); Serial.println("顏色取樣完成");   
+          Serial.println("請在5秒內換移開本次採樣的物件"); 
+          collectFinishedCond = 0;
+          for(int q = 0; q < 5; q++){
+            Serial.println(5 - q);
+            delay(1000);
+          }
+          showStageInfo = false;
+          if(sensorArrayIndex == FEATURE_LEN){
+            // 匯出特徵資料字串
+            exporter.dataExport(sensorData, FEATURE_DIM, ROUND, CLASS_TOTAL);
+            Serial.println("可以將特徵資料字串複製起來並存成TXT檔, 若需要重新蒐集資料請重置ESP32");
+            while(1);
+          }
+          break;
+        }
+      }
     }
   }
-}  
+}
