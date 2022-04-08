@@ -1,33 +1,20 @@
 /*
-  OLED 模組顯示文字
+  讀取按鈕開關狀態
 */
-#include <Wire.h>
-#include <Adafruit_GFX.h>
-#include <Adafruit_SSD1306.h>
+#include <Flag_Switch.h>
 
 // ------------全域變數------------
-// OLED物件
-Adafruit_SSD1306 display(
-  128, 
-  64, 
-  &Wire
-);
-// -------------------------------
+// 按鈕開關物件
+Flag_Switch btn(39);
 
-void setup(){
-  Serial.begin(115200);
-
-  if(display.begin(SSD1306_SWITCHCAPVCC,0x3C)){
-    display.clearDisplay();
-    display.setTextSize(1);
-    display.setCursor(0,0);
-    display.setTextColor(WHITE,BLACK);
-    display.println("FLAG X AIfES");
-    display.display();
-  }else{
-    Serial.println("OLED初始化失敗, 請重置~");
-    while(1);
-  }
+void setup() {
+  // 腳位設置
+  pinMode(LED_BUILTIN, OUTPUT);
+  digitalWrite(LED_BUILTIN, HIGH);
 }
 
-void loop(){}
+void loop() {
+  // 透過按鈕開關控制內建 LED
+  if(btn.read())  digitalWrite(LED_BUILTIN, LOW);
+  else            digitalWrite(LED_BUILTIN, HIGH);
+}

@@ -26,7 +26,7 @@ float labelMaxAbs;
 // -------------------------------
 
 void setup() {
-  // UART config
+  // 序列埠設置
   Serial.begin(115200);
 
   // hx711設置

@@ -3,29 +3,23 @@
 */
 #include "./inc/bitmap.h"
 #include <Wire.h>
-//#include <Adafruit_GFX.h>
+#include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
 #include <Flag_Switch.h>
 
-#define SCREEN_WIDTH 128
-#define SCREEN_HIGHT 64
-#define OLED_RESET -1
 #define PAGE_TOTAL 3
-#define NEXT_PIN_NUM 39
-#define PREV_PIN_NUM 34
 
 // ------------全域變數------------
 // OLED物件
 Adafruit_SSD1306 display(
-  SCREEN_WIDTH, 
-  SCREEN_HIGHT, 
-  &Wire, 
-  OLED_RESET
+  128, 
+  64, 
+  &Wire
 );
 
 // 感測器的物件
-Flag_Switch nextBtn(NEXT_PIN_NUM, INPUT);
-Flag_Switch prevBtn(PREV_PIN_NUM, INPUT);
+Flag_Switch nextBtn(39);
+Flag_Switch prevBtn(34);
 
 // UI會用到的參數
 uint8_t currentPage;
@@ -110,7 +104,8 @@ void drawPage3(){
 
 void setup(){
   Serial.begin(115200);
-
+  
+  Wire.setPins(23,19);
   if(!display.begin(SSD1306_SWITCHCAPVCC,0x3C)){
     Serial.println("OLED初始化失敗, 請重置~");
     while(1);

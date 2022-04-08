@@ -1,5 +1,5 @@
 /*
-  自製電子秤
+  使用電子秤模組
 */
 #include <Flag_HX711.h>
 
@@ -12,7 +12,7 @@ void setup() {
   // 序列埠設置
   Serial.begin(115200);
 
-  // HX711初始化
+  // HX711 初始化
   hx711.begin();
 
   // 歸零調整

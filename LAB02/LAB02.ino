@@ -9,7 +9,7 @@
 Flag_DataReader trainDataReader;
 Flag_DataReader testDataReader;
 
-// 指向存放資料的指標
+// 指向存放資料的指位器
 Flag_DataBuffer *trainData;
 Flag_DataBuffer *testData;
 
@@ -39,7 +39,7 @@ void setup() {
     trainData->feature[j] = (trainData->feature[j] - mean) / sd;
   }
 
-  // 取得標籤資料的最大絕對值
+  // 取得訓練標籤資料的最大絕對值
   float labelMaxAbs = trainData->labelMaxAbs;
 
   // 訓練標籤資料的正規化: 除以標籤最大值
@@ -50,7 +50,7 @@ void setup() {
   // -------------------------- 建構模型 --------------------------
   Flag_ModelParameter modelPara;
   Flag_LayerSequence nnStructure[] = {
-    {  // 輸入層 
+    { // 輸入層 
       .layerType = model.LAYER_INPUT, 
       .neurons =  0, 
       .activationType = model.ACTIVATION_NONE
@@ -70,41 +70,40 @@ void setup() {
       .neurons =  1, 
       .activationType = model.ACTIVATION_RELU
     }
-  };          
+  };      
+  modelPara.layerSize = FLAG_MODEL_GET_LAYER_SIZE(nnStructure);                    
+  modelPara.layerSeq = nnStructure;    
   modelPara.inputLayerPara = 
     FLAG_MODEL_2D_INPUT_LAYER_DIM(trainData->featureDim);
-  modelPara.layerSize = FLAG_MODEL_GET_LAYER_SIZE(nnStructure);                    
-  modelPara.layerSeq = nnStructure;
   modelPara.lossFuncType  = model.LOSS_FUNC_MSE;
   modelPara.optimizerPara = {
     .optimizerType = model.OPTIMIZER_ADAM, 
     .learningRate = 0.001, 
-    .epochs = 2000, 
-    .batch_size = 10
+    .epochs = 2000
   };
   model.begin(&modelPara);
 
   // -------------------------- 訓練模型 --------------------------
   // 創建訓練用的特徵張量
   uint16_t train_feature_shape[] = {
-    trainData->dataLen, 
-    trainData->featureDim
+    trainData->dataLen,    // 特徵資料筆數
+    trainData->featureDim  // 特徵資料維度
   };
 
   aitensor_t train_feature_tensor = AITENSOR_2D_F32(
-    train_feature_shape, 
-    trainData->feature
+    train_feature_shape,   // 特徵資料形狀
+    trainData->feature     // 特徵資料來源
   );
 
   // 創建訓練用的標籤張量
   uint16_t train_label_shape[] = {
-    trainData->dataLen, 
-    trainData->labelDim
+    trainData->dataLen,    // 標籤資料筆數
+    trainData->labelDim    // 標籤資料維度
   }; 
 
   aitensor_t train_label_tensor = AITENSOR_2D_F32(
-    train_label_shape, 
-    trainData->label
+    train_label_shape,     // 標籤資料形狀
+    trainData->label       // 標籤資料來源
   ); 
 
   // 訓練模型 
@@ -119,18 +118,22 @@ void setup() {
 
   Serial.println("預測值:\t\t實際值:");
   for(uint32_t i = 0; i < testData->dataLen; i++){
+    // 測試資料預處理
+    testData->feature[i] = (testData->feature[i] - mean) / sd;
+
+    // 模型預測
     uint16_t test_feature_shape[] = {
-      1, 
+      1, // 每次測試一筆資料
       testData->featureDim
     }; 
     aitensor_t test_feature_tensor = 
       AITENSOR_2D_F32(test_feature_shape, &testData->feature[i]);
     aitensor_t *test_output_tensor;
-    float predictVal;
     
-    testData->feature[i] = (testData->feature[i] - mean) / sd;
-
     test_output_tensor = model.predict(&test_feature_tensor); 
+
+    // 輸出預測結果
+    float predictVal;
     model.getResult(test_output_tensor, labelMaxAbs, &predictVal);  
     Serial.print(predictVal);
     Serial.print("\t\t");

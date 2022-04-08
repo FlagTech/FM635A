@@ -499,12 +499,15 @@ class Flag_Model {
     //Purpose: 訓練model用的
     //Parameter: None
     //Return: None
-    void train(aitensor_t *feature_tensor, aitensor_t *label_tensor){
+    void train(aitensor_t *feature_tensor, aitensor_t *label_tensor, uint16_t print_interval = 0){
       Flag_ModelParameter *para = &_para;
       float loss;
       uint32_t batch_size = para->optimizerPara.batch_size;  // 資料筆數, 當作batch size
       uint16_t epochs = para->optimizerPara.epochs;          // 學習次數
-      uint16_t print_interval = epochs / 10;
+ 
+      if(print_interval == 0) print_interval = epochs / 10;
+
+      if(batch_size == 0)  batch_size = feature_tensor->shape[0];
 
       if(_debugInfoType <= INFO_BASE){
         Serial.println(F("--------- 訓練開始 ---------"));

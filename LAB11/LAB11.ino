@@ -245,7 +245,7 @@ void drawPage5(float weight){
 }
 
 void setup(){
-  // UART設置
+   // 序列埠設置
   Serial.begin(115200);
 
   // hx711設置
@@ -268,6 +268,7 @@ void setup(){
   client.setCACert(root_ca);
   
   // OLED 初始化
+  Wire.setPins(23,19);
   if(!display.begin(SSD1306_SWITCHCAPVCC,0x3C)){
     Serial.println("OLED初始化失敗, 請重置~");
     while(1);
