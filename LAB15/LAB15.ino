@@ -1,5 +1,5 @@
 /*
-  顏色辨識感測器 -- 訓練與評估
+  農產品識別系統
 */
 #include <Flag_DataReader.h>
 #include <Flag_Model.h>
@@ -82,36 +82,12 @@ void setup() {
     train_feature_data[j] = (train_feature_data[j] - mean) / sd;
   }
 
-  Serial.println(F("----- 顏色辨識模型訓練 -----"));
+  Serial.println(F("----- 農產品識別系統 -----"));
   Serial.println();
 
   // -------------------------- 建構模型 --------------------------
-  uint32_t classNum = reader.getNumOfFiles();
-  Flag_ModelParameter modelPara;
-  Flag_LayerSequence nnStructure[] = {{.layerType = model.LAYER_INPUT, .neurons =  0,       .activationType = model.ACTIVATION_NONE},     // input layer
-                                      {.layerType = model.LAYER_DENSE, .neurons = 10,       .activationType = model.ACTIVATION_RELU},     // hidden layer
-                                      {.layerType = model.LAYER_DENSE, .neurons = classNum, .activationType = model.ACTIVATION_SOFTMAX}}; // output layer
-  modelPara.inputLayerPara = FLAG_MODEL_2D_INPUT_LAYER_DIM(data->featureDim);
-  modelPara.layerSize = FLAG_MODEL_GET_LAYER_SIZE(nnStructure);
-  modelPara.layerSeq = nnStructure;
-  modelPara.lossFuncType  = model.LOSS_FUNC_CORSS_ENTROPY;
-  modelPara.optimizerPara = {.optimizerType = model.OPTIMIZER_ADAM, .learningRate = 0.001, .epochs = 1900, .batch_size = 20};
-  model.begin(&modelPara);
-
-  // -------------------------- 訓練模型 --------------------------
-  // 創建訓練用的特徵張量
-  uint16_t train_feature_shape[] = {data->dataLen, data->featureDim};
-  aitensor_t train_feature_tensor = AITENSOR_2D_F32(train_feature_shape, train_feature_data);
-
-  // 創建訓練用的標籤張量
-  uint16_t train_label_shape[] = {data->dataLen, data->labelDim}; 
-  aitensor_t train_label_tensor = AITENSOR_2D_F32(train_label_shape, train_label_data); 
-
-  // 訓練模型 
-  model.train(&train_feature_tensor, &train_label_tensor);
-  
-  // 匯出模型
-  model.save();
+  // 讀取已訓練的模型檔
+  model.begin("/color_model.json");
 }
 
 void loop(){
@@ -152,32 +128,32 @@ void loop(){
       sensorData[1] = greenRatio;
       sensorData[2] = blueRatio;
 
-      // 取得一筆特徵資料, 並使用訓練好的模型來預測以進行評估
-      float *eval_feature_data = sensorData; 
-      uint16_t eval_feature_shape[] = {1, FEATURE_DIM};
-      aitensor_t eval_feature_tensor = AITENSOR_2D_F32(eval_feature_shape, eval_feature_data);
-      aitensor_t *eval_output_tensor;
+      // 取得一筆特徵資料, 並使用訓練好的模型來進行預測
+      float *test_feature_data = sensorData; 
+      uint16_t test_feature_shape[] = {1, FEATURE_DIM};
+      aitensor_t test_feature_tensor = AITENSOR_2D_F32(test_feature_shape, test_feature_data);
+      aitensor_t *test_output_tensor;
       float predictVal[model.getNumOfOutputs()];
 
       // 測試資料預處理
       for(int i = 0; i < FEATURE_DIM ; i++){
-        eval_feature_data[i] = (eval_feature_data[i] - mean) / sd;
+        test_feature_data[i] = (test_feature_data[i] - mean) / sd;
       }
 
       // 模型預測
-      eval_output_tensor = model.predict(&eval_feature_tensor);
-      model.getResult(eval_output_tensor, predictVal);
-      
-      // 輸出預測結果
-      Serial.print(F("預測結果: "));
-      model.printResult(predictVal);
+      test_output_tensor = model.predict(&test_feature_tensor);
+      model.getResult(test_output_tensor, predictVal);
 
-      // 找到機率最大的索引值
+      // 模型預測
       uint8_t maxIndex = model.argmax(predictVal);
-      switch(maxIndex){
-        case 0:  Serial.println("紅色"); break;
-        case 1:  Serial.println("藍色"); break;
-        case 2:  Serial.println("黃色"); break;
+      if(predictVal[maxIndex] > 0.99){
+        switch(maxIndex){
+          case 0:  Serial.println("草莓"); break;
+          case 1:  Serial.println("藍莓"); break;
+          case 2:  Serial.println("香蕉"); break;
+        }
+      }else{
+        Serial.println("無法識別");
       }
       
       delay(1000);

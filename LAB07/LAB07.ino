@@ -1,5 +1,5 @@
 /*
-  讀取按鈕開關狀態
+  讀取按壓開關狀態
 */
 #include <Flag_Switch.h>
 

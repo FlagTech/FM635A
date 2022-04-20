@@ -1,33 +1,42 @@
 /*
-  顏色辨識感測器 -- 蒐集訓練資料
+  顏色辨識感測器 -- 訓練與評估
 */
+#include <Flag_DataReader.h>
+#include <Flag_Model.h>
+#include <Flag_DataExporter.h>
 #include <Wire.h>
 #include <SparkFun_APDS9960.h>
-#include <Flag_DataExporter.h>
 
 #define LED_ON  0
 #define LED_OFF 1
 
 // 取APDS9960的3個參數(SENSOR_PARA)為一筆特徵資料
-// 3種分類各取50筆(ROUND)
-#define CLASS_TOTAL 3
-#define ROUND 50
 #define SENSOR_PARA 3
 #define FEATURE_DIM SENSOR_PARA
-#define FEATURE_LEN (FEATURE_DIM * ROUND * CLASS_TOTAL)
 
 //------------全域變數------------
+// 讀取資料的物件
+Flag_DataReader reader;
+Flag_DataBuffer *data;
+
+// 神經網路模型
+Flag_Model model; 
+
 // 感測器的物件
 SparkFun_APDS9960 apds = SparkFun_APDS9960();
 
-// 匯出蒐集資料會用的物件
-Flag_DataExporter exporter;
+// 訓練用的特徵資料
+float *train_feature_data;
+
+// 對應特徵資料的標籤值
+float *train_label_data;
+
+// 資料預處理會用到的參數
+float mean;
+float sd;
 
 // 蒐集資料會用到的參數
-float sensorData[FEATURE_LEN]; 
-uint32_t sensorArrayIndex = 0;
-uint32_t collectFinishedCond = 0;
-bool showStageInfo = false;
+float sensorData[FEATURE_DIM]; 
 //--------------------------------
 
 void setup() {
@@ -35,15 +44,15 @@ void setup() {
   Serial.begin(115200);
 
   // 初始化APDS9960
-  if(apds.init()) Serial.println(F("APDS-9960 初始化完成"));
-  else            Serial.println(F("APDS-9960 初始化錯誤"));
+  if(apds.init()) Serial.println(F("APDS-9960初始化完成"));
+  else            Serial.println(F("APDS-9960初始化錯誤"));
   
   // 啟用APDS-9960光傳感器
   if(apds.enableLightSensor(false)) Serial.println(F("光傳感器正在運行"));
   else                              Serial.println(F("光傳感器初始化錯誤"));
   
   // 調整接近傳感器增益
-  if(!apds.setProximityGain(PGAIN_2X)) Serial.println(F("設置 PGAIN 時出現問題"));
+  if(!apds.setProximityGain(PGAIN_2X)) Serial.println(F("設置PGAIN時出現問題"));
   
   // 啟用APDS-9960接近傳感器
   if(apds.enableProximitySensor(false)) Serial.println(F("接近傳感器正在運行"));
@@ -53,20 +62,68 @@ void setup() {
   pinMode(LED_BUILTIN, OUTPUT);
   digitalWrite(LED_BUILTIN, LED_OFF);
 
-  Serial.println(F("---蒐集顏色辨識的特徵資料與標籤資料---"));
+  // 多元分類類型的資料讀取
+  data = reader.read("/dataset/red.txt,/dataset/blue.txt,/dataset/yellow.txt", reader.MODE_CATEGORICAL);
+  
+  // 設定訓練用的特徵資料
+  train_feature_data = data->feature;
+
+  // 設定對應特徵資料的標籤值
+  train_label_data = data->label;
+
+  // 取得特徵資料的平均值
+  mean = data->featureMean;
+
+  // 取得特徵資料的標準差
+  sd = data->featureSd;
+        
+  // 特徵資料正規化: 標準差法
+  for(int j = 0; j < data->featureDataArryLen; j++){
+    train_feature_data[j] = (train_feature_data[j] - mean) / sd;
+  }
+
+  Serial.println(F("----- 顏色辨識模型訓練 -----"));
   Serial.println();
+
+  // -------------------------- 建構模型 --------------------------
+  uint32_t classNum = reader.getNumOfFiles();
+  Flag_ModelParameter modelPara;
+  Flag_LayerSequence nnStructure[] = {{.layerType = model.LAYER_INPUT, .neurons =  0,       .activationType = model.ACTIVATION_NONE},     // input layer
+                                      {.layerType = model.LAYER_DENSE, .neurons = 10,       .activationType = model.ACTIVATION_RELU},     // hidden layer
+                                      {.layerType = model.LAYER_DENSE, .neurons = classNum, .activationType = model.ACTIVATION_SOFTMAX}}; // output layer
+  modelPara.inputLayerPara = FLAG_MODEL_2D_INPUT_LAYER_DIM(data->featureDim);
+  modelPara.layerSize = FLAG_MODEL_GET_LAYER_SIZE(nnStructure);
+  modelPara.layerSeq = nnStructure;
+  modelPara.lossFuncType  = model.LOSS_FUNC_CORSS_ENTROPY;
+  modelPara.optimizerPara = {.optimizerType = model.OPTIMIZER_ADAM, .learningRate = 0.001, .epochs = 1900, .batch_size = 20};
+  model.begin(&modelPara);
+
+  // -------------------------- 訓練模型 --------------------------
+  // 創建訓練用的特徵張量
+  uint16_t train_feature_shape[] = {data->dataLen, data->featureDim};
+  aitensor_t train_feature_tensor = AITENSOR_2D_F32(train_feature_shape, train_feature_data);
+
+  // 創建訓練用的標籤張量
+  uint16_t train_label_shape[] = {data->dataLen, data->labelDim}; 
+  aitensor_t train_label_tensor = AITENSOR_2D_F32(train_label_shape, train_label_data); 
+
+  // 訓練模型 
+  model.train(&train_feature_tensor, &train_label_tensor);
+  
+  // 匯出模型
+  model.save();
 }
 
 void loop(){
   uint8_t proximity_data = 0;
   uint16_t red_light = 0,green_light = 0,blue_light = 0, ambient_light = 0;
-  
+
   if(!apds.readProximity(proximity_data)){
     Serial.println("此次讀取接近值錯誤");
   }
 
   // 當開始蒐集資料的條件達成時, 開始蒐集
-  if (proximity_data == 255 && collectFinishedCond != ROUND) {
+  if (proximity_data == 255) {
     // 蒐集資料時, 內建指示燈會亮
     digitalWrite(LED_BUILTIN, LED_ON);
 
@@ -79,51 +136,54 @@ void loop(){
     }else{
       // 計算總信號中各種顏色的比例。 它們被標準化為0至1的範圍。
       float sum = red_light + green_light + blue_light;
+
+      // 偵測顏色會用到的參數
       float redRatio = 0;
       float greenRatio = 0;
       float blueRatio = 0;
       
-      // 偵測顏色會用到的參數
       if(sum != 0){
         redRatio = red_light / sum;
         greenRatio = green_light / sum;
         blueRatio = blue_light / sum;
       }
      
-      sensorData[sensorArrayIndex] = redRatio;   sensorArrayIndex++;
-      sensorData[sensorArrayIndex] = greenRatio; sensorArrayIndex++;
-      sensorData[sensorArrayIndex] = blueRatio;  sensorArrayIndex++;
-      collectFinishedCond++;
-      delay(500);
+      sensorData[0] = redRatio;
+      sensorData[1] = greenRatio;
+      sensorData[2] = blueRatio;
 
-      Serial.println("取得一筆資料");
-      if(collectFinishedCond == ROUND) showStageInfo = true;
+      // 取得一筆特徵資料, 並使用訓練好的模型來預測以進行評估
+      float *eval_feature_data = sensorData; 
+      uint16_t eval_feature_shape[] = {1, FEATURE_DIM};
+      aitensor_t eval_feature_tensor = AITENSOR_2D_F32(eval_feature_shape, eval_feature_data);
+      aitensor_t *eval_output_tensor;
+      float predictVal[model.getNumOfOutputs()];
+
+      // 測試資料預處理
+      for(int i = 0; i < FEATURE_DIM ; i++){
+        eval_feature_data[i] = (eval_feature_data[i] - mean) / sd;
+      }
+
+      // 模型預測
+      eval_output_tensor = model.predict(&eval_feature_tensor);
+      model.getResult(eval_output_tensor, predictVal);
+      
+      // 輸出預測結果
+      Serial.print(F("預測結果: "));
+      model.printResult(predictVal);
+
+      // 找到機率最大的索引值
+      uint8_t maxIndex = model.argmax(predictVal);
+      switch(maxIndex){
+        case 0:  Serial.println("紅色"); break;
+        case 1:  Serial.println("藍色"); break;
+        case 2:  Serial.println("黃色"); break;
+      }
+      
+      delay(1000);
     }
   } else {
     // 未蒐集資料時, 內建指示燈不亮
     digitalWrite(LED_BUILTIN, LED_OFF);
-    
-    // 每一個階段都會提示該階段蒐集完成的訊息, 並且僅顯示一次
-    if(showStageInfo){
-      for(int i = 0; i < CLASS_TOTAL; i++){
-        if(sensorArrayIndex == FEATURE_LEN / CLASS_TOTAL * (i+1)){
-          Serial.print("物件"); Serial.print(i); Serial.println("顏色取樣完成");   
-          Serial.println("請在5秒內換移開本次採樣的物件"); 
-          collectFinishedCond = 0;
-          for(int q = 0; q < 5; q++){
-            Serial.println(5 - q);
-            delay(1000);
-          }
-          showStageInfo = false;
-          if(sensorArrayIndex == FEATURE_LEN){
-            // 匯出特徵資料字串
-            exporter.dataExport(sensorData, FEATURE_DIM, ROUND, CLASS_TOTAL);
-            Serial.println("可以將特徵資料字串複製起來並存成TXT檔, 若需要重新蒐集資料請重置ESP32");
-            while(1);
-          }
-          break;
-        }
-      }
-    }
   }
 }

@@ -16,13 +16,13 @@ void setup() {
   hx711.begin();
 
   // 歸零調整
-  hx711.tare();  
+  hx711.tare();
 }
 
 void loop() {
   // 顯示重量
   float weight = hx711.getWeight();
-  Serial.print("重量: "); 
-  Serial.print(weight, 1); 
+  Serial.print("重量: ");
+  Serial.print(weight, 1);
   Serial.println('g');
 }

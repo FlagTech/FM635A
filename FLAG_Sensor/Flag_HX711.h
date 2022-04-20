@@ -29,8 +29,8 @@ class Flag_HX711
             pinMode(DOUT, INPUT);
             digitalWrite(SCK, LOW);
             
-            //首次先把que塞滿
-            for(uint32_t  i = 0; i < _que.getBufSize() * 2; i++){
+            //首次先把que塞滿3次, 只是穩定用而已
+            for(uint32_t  i = 0; i < _que.getBufSize() * 3; i++){
                 readRawData();
             }
         }
@@ -73,7 +73,9 @@ class Flag_HX711
 
         void tare(){
             // 取移動平均 (平均_que.buffer size筆)
-            readRawData();
+            for(uint32_t  i = 0; i < _que.getBufSize(); i++){
+                readRawData();
+            }
             setOffset(_que.avg());
         }
 
@@ -87,6 +89,14 @@ class Flag_HX711
 
         // 取得weight平均值
         float getWeight() {
+            for(uint32_t  i = 0; i < _que.getBufSize(); i++){
+                readRawData();
+            }
+            float weight = (_que.avg() - OFFSET) * COEFFICIENT; 
+            return weight; 
+        }
+        
+        float getWeightAsync() {
             // 取移動平均 (平均_que.buffer size筆)
             readRawData();
             float weight = (_que.avg() - OFFSET) * COEFFICIENT; 

@@ -22,7 +22,7 @@ void setup() {
   Serial.begin(115200);
 
   // ------------------------- 資料預處理 -------------------------
-  // 回歸類型的訓練資料讀取
+  // 迴歸類型的訓練資料讀取
   trainData = trainDataReader.read(
     "/dataset/women_train.txt", 
     trainDataReader.MODE_REGRESSION
@@ -34,15 +34,15 @@ void setup() {
   // 取得訓練特徵資料的標準差
   float sd = trainData->featureSd;
 
-  // 訓練特徵資料的正規化: 標準化
+  // 縮放訓練特徵資料: 標準化
   for(int j = 0; j < trainData->featureDataArryLen; j++){
     trainData->feature[j] = (trainData->feature[j] - mean) / sd;
   }
 
-  // 取得訓練標籤資料的最大絕對值
+  // 取得最大訓練標籤資料的絕對值
   float labelMaxAbs = trainData->labelMaxAbs;
 
-  // 訓練標籤資料的正規化: 除以標籤最大值
+  // 縮放訓練標籤資料: 除以最大標籤的絕對值
   for(int j = 0; j < trainData->labelDataArryLen; j++){
     trainData->label[j] /= labelMaxAbs;  
   }
@@ -70,9 +70,9 @@ void setup() {
       .neurons =  1, 
       .activationType = model.ACTIVATION_RELU
     }
-  };      
-  modelPara.layerSize = FLAG_MODEL_GET_LAYER_SIZE(nnStructure);                    
-  modelPara.layerSeq = nnStructure;    
+  };   
+  modelPara.layerSeq = nnStructure;   
+  modelPara.layerSize = FLAG_MODEL_GET_LAYER_SIZE(nnStructure);
   modelPara.inputLayerPara = 
     FLAG_MODEL_2D_INPUT_LAYER_DIM(trainData->featureDim);
   modelPara.lossFuncType  = model.LOSS_FUNC_MSE;
@@ -110,7 +110,7 @@ void setup() {
   model.train(&train_feature_tensor, &train_label_tensor);
 
   // -------------------------- 評估模型 --------------------------
-  // 回歸類型的測試資料讀取
+  // 迴歸類型的測試資料讀取
   testData = testDataReader.read(
     "/dataset/women_test.txt", 
     testDataReader.MODE_REGRESSION
@@ -130,11 +130,11 @@ void setup() {
       AITENSOR_2D_F32(test_feature_shape, &testData->feature[i]);
     aitensor_t *test_output_tensor;
     
-    test_output_tensor = model.predict(&test_feature_tensor); 
+    test_output_tensor = model.predict(&test_feature_tensor);
 
     // 輸出預測結果
     float predictVal;
-    model.getResult(test_output_tensor, labelMaxAbs, &predictVal);  
+    model.getResult(test_output_tensor, labelMaxAbs, &predictVal);
     Serial.print(predictVal);
     Serial.print("\t\t");
     Serial.println(testData->label[i]); 

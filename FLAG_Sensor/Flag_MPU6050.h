@@ -51,14 +51,14 @@ class Flag_MPU6050{
       memset(&data,0,sizeof(data));
     }
 
-    void init(int sda_pin = 26, int scl_pin = 25, uint16_t i2c_addr = 0x68){
+    void init(int sda_pin = 21, int scl_pin = 22, uint16_t i2c_addr = 0x68){
       //取決於MPU6050 A0 pin:
       //Lo => 0x68
       //Hi => 0x69
       this->i2c_addr = i2c_addr;
       
       //會使用到Wire庫
-      Wire.begin(21,22); 
+      Wire.begin(sda_pin,scl_pin); 
 
       //detect MPU6050
       Wire.beginTransmission(i2c_addr);

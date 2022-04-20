@@ -1,5 +1,5 @@
 /*
-  電子料理秤 -- 訓練與評估
+  電子秤 -- 訓練與評估
 */
 #include <Flag_DataReader.h>
 #include <Flag_Model.h>
@@ -35,7 +35,7 @@ void setup() {
   hx711.tare();  
 
   // ------------------------- 資料預處理 -------------------------
-  // 回歸類型的訓練資料讀取
+  // 迴歸類型的訓練資料讀取
   trainData = trainDataReader.read(
     "/dataset/weight.txt", 
     trainDataReader.MODE_REGRESSION
@@ -47,15 +47,15 @@ void setup() {
   // 取得訓練特徵資料的標準差
   sd = trainData->featureSd;
 
-  // 訓練特徵資料的正規化: 標準化
+  // 縮放訓練特徵資料: 標準化
   for(int j = 0; j < trainData->featureDataArryLen; j++){
     trainData->feature[j] = (trainData->feature[j] - mean) / sd;
   }
 
-  // 取得訓練標籤資料的最大絕對值
+  // 取得最大訓練標籤資料的絕對值
   labelMaxAbs = trainData->labelMaxAbs; 
 
-  // 訓練標籤資料的正規化: 除以標籤最大值
+  // 縮放訓練標籤資料: 除以最大標籤的絕對值
   for(int j = 0; j < trainData->labelDataArryLen; j++){
     trainData->label[j] /= labelMaxAbs;  
   }
@@ -83,16 +83,16 @@ void setup() {
       .neurons =  1, 
       .activationType = model.ACTIVATION_RELU
     }
-  };       
-  modelPara.layerSize = FLAG_MODEL_GET_LAYER_SIZE(nnStructure);                    
-  modelPara.layerSeq = nnStructure; 
+  };      
+  modelPara.layerSeq = nnStructure;  
+  modelPara.layerSize = FLAG_MODEL_GET_LAYER_SIZE(nnStructure);
   modelPara.inputLayerPara = 
     FLAG_MODEL_2D_INPUT_LAYER_DIM(trainData->featureDim);
   modelPara.lossFuncType  = model.LOSS_FUNC_MSE;
   modelPara.optimizerPara = {
     .optimizerType = model.OPTIMIZER_ADAM, 
     .learningRate = 0.001, 
-    .epochs = 800
+    .epochs = 2000
   };
   model.begin(&modelPara);
 
@@ -143,7 +143,7 @@ void loop() {
   aitensor_t *test_output_tensor;
   float predictVal;
   
-  test_output_tensor = model.predict(&test_feature_tensor); 
+  test_output_tensor = model.predict(&test_feature_tensor);
   
   // 輸出預測結果
   model.getResult(test_output_tensor, labelMaxAbs, &predictVal);
