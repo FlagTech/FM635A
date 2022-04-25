@@ -1,19 +1,16 @@
 /*
-  手勢記錄 -- 訓練與評估
+  手勢辨識 -- 訓練與評估
 */
 #include <Flag_DataReader.h>
 #include <Flag_Model.h>
 #include <Flag_MPU6050.h>
 #include <Flag_Switch.h>
 
-#define LED_ON  0
-#define LED_OFF 1
-#define COLLECT_BTN_PIN 39
-
-// 1個週期(PERIOD)取MPU6050的6個參數(SENSOR_PARA)
-// 每10個週期(PERIOD)為一筆特徵資料
-#define PERIOD 10
+// 1 個週期 (PERIOD) 取 MPU6050 的 6 個參數 (SENSOR_PARA)
+-------------------------------------------------------
+// 每 10 個週期 (PERIOD) 為一筆特徵資料
 #define SENSOR_PARA 6
+#define PERIOD 10
 #define FEATURE_DIM (PERIOD * SENSOR_PARA)
 
 //------------全域變數------------
@@ -26,7 +23,7 @@ Flag_Model model;
 
 // 感測器的物件
 Flag_MPU6050 mpu6050;
-Flag_Switch collectBtn(COLLECT_BTN_PIN, INPUT);
+Flag_Switch collectBtn(39);
 
 // 訓練用的特徵資料
 float *train_feature_data;
@@ -46,16 +43,16 @@ uint32_t lastMeaureTime = 0;
 //--------------------------------
 
 void setup() {
-  // UART設置
+  // 序列埠設置
   Serial.begin(115200);
 
-  // mpu6050設置
+  // MPU6050 初始化
   mpu6050.init();
   while(!mpu6050.isReady()); 
 
-  // GPIO設置
+  // 腳位設置
   pinMode(LED_BUILTIN, OUTPUT);
-  digitalWrite(LED_BUILTIN, LED_OFF);
+  digitalWrite(LED_BUILTIN, HIGH);
 
   // 多元分類類型的資料讀取
   data = reader.read("/dataset/one.txt,/dataset/two.txt,/dataset/three.txt", reader.MODE_CATEGORICAL);
@@ -116,7 +113,7 @@ void loop() {
   // 當按鈕按下時開始蒐集資料 
   if(collectBtn.read()){
     // 蒐集資料時, 內建指示燈會亮
-    digitalWrite(LED_BUILTIN, LED_ON);
+    digitalWrite(LED_BUILTIN, LOW);
 
     // 100ms為一個週期來取一次mpu6050資料, 連續取10個週期作為一筆特徵資料, 也就是一秒會取到一筆特徵資料
     if(millis() - lastMeaureTime > 100){
@@ -164,7 +161,7 @@ void loop() {
     }
   }else{
     // 未蒐集資料時, 內建指示燈不亮
-    digitalWrite(LED_BUILTIN, LED_OFF);
+    digitalWrite(LED_BUILTIN, HIGH);
 
     // 按鈕放開, 則代表特徵資料要重新蒐集
     collectFinishedCond = 0;

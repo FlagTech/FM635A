@@ -92,7 +92,7 @@ void setup() {
   modelPara.optimizerPara = {
     .optimizerType = model.OPTIMIZER_ADAM, 
     .learningRate = 0.001, 
-    .epochs = 2000
+    .epochs = 3000
   };
   model.begin(&modelPara);
 

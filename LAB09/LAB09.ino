@@ -47,7 +47,7 @@ void drawPage1(){
   display.println("Flash");
 
   // 第 1 頁的右鍵
-  display.drawBitmap(112, 26, bitmap_right_btn, 16, 27, HITE);
+  display.drawBitmap(112, 26, bitmap_right_btn, 16, 27, WHITE);
 
   // 第 1 頁的照片
   display.drawBitmap(42, 18, bitmap_flash, 44, 44, WHITE);

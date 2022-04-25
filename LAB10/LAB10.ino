@@ -1,5 +1,5 @@
 /*
-  每日飲食建議量推播系統--IFTTT
+  每日食物攝取紀錄--IFTTT
 */
 #include "./inc/ifttt.h"
 #include "./inc/bitmap.h"
@@ -12,17 +12,12 @@
 #include <Flag_HX711.h>
 #include <WiFiClientSecure.h>
 
+#define AP_SSID    "Xperia XZ Premium_db49"
+#define AP_PWD     "12345678"
+#define IFTTT_URL  "https://maker.ifttt.com/trigger/https_test/with/key/dg9J7YHL0mMuDaaRGs9pNU"
+
 #define PAGE_TOTAL 5
-
 enum{ RICE, FISH, MILK, VEGETABLE, FRUIT };
-
-String encodeTbl[] = {
-  "%e5%85%a8%e7%a9%80%e9%9b%9c%e7%b3%a7%e9%a1%9e",
-  "%e8%9b%8b%e8%b1%86%e9%ad%9a%e8%82%89%e9%a1%9e",
-  "%e4%b9%b3%e5%93%81%e9%a1%9e",
-  "%e8%94%ac%e8%8f%9c%e9%a1%9e",
-  "%e6%b0%b4%e6%9e%9c%e9%a1%9e"
-};
 
 // ------------全域變數------------
 // 讀取資料的物件
@@ -43,14 +38,21 @@ Adafruit_SSD1306 display(
 
 // 感測器的物件
 Flag_Switch btnPage(39);
-Flag_Switch btnConfrim(34);
+Flag_Switch btnRec(34);
 Flag_HX711 hx711(32, 33); // SCK, DT
 
 // 連網會用到的參數
-WiFiClientSecure client;  
-const char* ssid = "Xperia XZ Premium_db49";
-const char* password = "12345678";
+WiFiClientSecure client;
+const char* ssid = AP_SSID;
+const char* password = AP_PWD;
 const char* SERVER = "ifttt.com";
+String encodeTbl[] = {
+  "%e5%85%a8%e7%a9%80%e9%9b%9c%e7%b3%a7%e9%a1%9e",
+  "%e8%9b%8b%e8%b1%86%e9%ad%9a%e8%82%89%e9%a1%9e",
+  "%e4%b9%b3%e5%93%81%e9%a1%9e",
+  "%e8%94%ac%e8%8f%9c%e9%a1%9e",
+  "%e6%b0%b4%e6%9e%9c%e9%a1%9e"
+};
 
 // 資料預處理會用到的參數
 float mean;
@@ -60,12 +62,12 @@ float labelMaxAbs;
 // UI 會用到的參數
 uint8_t currentPage;
 bool btnPagePressed;
-bool btnConfrimPressed;
+bool btnRecPressed;
 // -------------------------------
 
-// IFTTT 通知 LINE
+// 傳送 LINE 訊息
 void notify(uint8_t item, float value){
-  String ifttt_url = "https://maker.ifttt.com/trigger/https_test/with/key/dg9J7YHL0mMuDaaRGs9pNU";
+  String ifttt_url = IFTTT_URL;
 
   Serial.println("\n開始連接伺服器…");
   if(!client.connect(SERVER, 443)){
@@ -82,6 +84,7 @@ void notify(uint8_t item, float value){
                        
     client.print(https_get);
 
+    // 接收並顯示伺服器的回應
     while(client.connected()){
       String line = client.readStringUntil('\n');
       if (line == "\r") {
@@ -89,12 +92,14 @@ void notify(uint8_t item, float value){
         break;
       }
     }
-    // 接收並顯示伺服器的回應
+    
     while(client.available()){
       char c = client.read();
       if(c != 0xFF) Serial.print(c);
       if(c == 0xFF) Serial.println();
     }
+
+    // 關閉連線
     client.stop();
   }
 }
@@ -119,18 +124,18 @@ void utilities(uint8_t item, float weight, float *total){
   display.print(*total);
   display.print("g");
 
-  // 偵測確認按鈕
-  if(btnConfrim.read()){
-    if(!btnConfrimPressed) {
-      btnConfrimPressed = true;
+  // 偵測記錄按鈕
+  if(btnRec.read()){
+    if(!btnRecPressed) {
+      btnRecPressed = true;
       *total += weight;
-      // 發通知
+      // 發 LINE 訊息
       if(*total){
         notify(item, *total);
       }
     }
   }else{
-    btnConfrimPressed = false;
+    btnRecPressed = false;
   }
 }
 
@@ -155,7 +160,7 @@ void drawPage1(float weight){
   display.println("Rice");
 
   // 第 1 頁的照片
-  display.drawBitmap(0, 18, bitmap_rice, 44, 44, WHITE); 
+  display.drawBitmap(0, 18, bitmap_rice, 44, 44, WHITE);
   
   // 調用小工具
   utilities(RICE, weight, &total);
@@ -185,7 +190,7 @@ void drawPage2(float weight){
   display.println("Fish");
 
   // 第 2 頁的照片
-  display.drawBitmap(0, 18, bitmap_fish, 44, 44, WHITE); 
+  display.drawBitmap(0, 18, bitmap_fish, 44, 44, WHITE);
  
   // 調用小工具
   utilities(FISH, weight, &total);
@@ -215,7 +220,7 @@ void drawPage3(float weight){
   display.println("Milk");
 
   // 第 3 頁的照片
-  display.drawBitmap(0, 18, bitmap_milk, 44, 44, WHITE); 
+  display.drawBitmap(0, 18, bitmap_milk, 44, 44, WHITE);
 
   // 調用小工具
   utilities(MILK, weight, &total);
@@ -245,7 +250,7 @@ void drawPage4(float weight){
   display.println("Vegetable");
 
   // 第 4 頁的照片
-  display.drawBitmap(0, 18, bitmap_vegetable, 44, 44, WHITE);  
+  display.drawBitmap(0, 18, bitmap_vegetable, 44, 44, WHITE);
 
   // 調用小工具
   utilities(VEGETABLE, weight, &total);
@@ -275,7 +280,7 @@ void drawPage5(float weight){
   display.println("Fruit");
 
   // 第 5 頁的照片
-  display.drawBitmap(0, 18, bitmap_fruit, 44, 44, WHITE); 
+  display.drawBitmap(0, 18, bitmap_fruit, 44, 44, WHITE);
 
   // 調用小工具
   utilities(FRUIT, weight, &total);
@@ -300,9 +305,7 @@ void setup(){
     Serial.print(".");
     delay(500);
   }
-
-  Serial.print("\n成功連上基地台!\nIP 位址：");
-  Serial.println(WiFi.localIP());
+  Serial.println("\n成功連上基地台!");
 
   // 設置CA憑證  
   client.setCACert(root_ca);
@@ -316,7 +319,7 @@ void setup(){
   // UI 參數初始化
   currentPage = 1;
   btnPagePressed = false;
-  btnConfrimPressed = false;
+  btnRecPressed = false;
 
   // 迴歸類型的訓練資料讀取
   data = reader.read(
@@ -372,11 +375,11 @@ void loop(){
   
   // 輸出預測結果
   Serial.print("重量: ");
-  model.getResult(test_output_tensor, labelMaxAbs, &predictVal);  //因為標籤資料有經過正規化, 所以要將label的比例還原回來
+  model.getResult(test_output_tensor, labelMaxAbs, &predictVal);
   Serial.print(predictVal); 
   Serial.println('g');
   
-  switch(currentPage){
+  switch(currentPage - 1){
     case RICE:      drawPage1(predictVal); break;
     case FISH:      drawPage2(predictVal); break;
     case MILK:      drawPage3(predictVal); break;

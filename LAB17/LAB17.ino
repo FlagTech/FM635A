@@ -1,5 +1,5 @@
 /*
-  手勢記錄 -- 蒐集訓練資料
+  手勢辨識 -- 蒐集訓練資料
 */
 #include <Flag_MPU6050.h>
 #include <Flag_Switch.h>
@@ -35,16 +35,13 @@ void setup(){
   // 序列埠設置
   Serial.begin(115200);
   
-  // MPU6050 設置
+  // MPU6050 初始化
   mpu6050.init();
   while(!mpu6050.isReady());
 
   // 腳位設置
   pinMode(LED_BUILTIN, OUTPUT);
   digitalWrite(LED_BUILTIN, HIGH);
-
-  Serial.println(F("----- 手勢資料蒐集 -----"));
-  Serial.println();
 }
 
 void loop(){
