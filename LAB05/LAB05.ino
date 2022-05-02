@@ -34,7 +34,7 @@ void setup() {
   // 歸零調整
   hx711.tare();  
 
-  // ------------------------- 資料預處理 -------------------------
+  // ----------------- 資料預處理 ------------------
   // 迴歸類型的訓練資料讀取
   trainData = trainDataReader.read(
     "/dataset/weight.txt", 
@@ -48,19 +48,26 @@ void setup() {
   sd = trainData->featureSd;
 
   // 縮放訓練特徵資料: 標準化
-  for(int j = 0; j < trainData->featureDataArryLen; j++){
-    trainData->feature[j] = (trainData->feature[j] - mean) / sd;
+  for(int j = 0; 
+      j < trainData->featureDataArryLen; 
+      j++)
+  {
+    trainData->feature[j] = 
+      (trainData->feature[j] - mean) / sd;
   }
 
   // 取得最大訓練標籤資料的絕對值
   labelMaxAbs = trainData->labelMaxAbs; 
 
   // 縮放訓練標籤資料: 除以最大標籤的絕對值
-  for(int j = 0; j < trainData->labelDataArryLen; j++){
+  for(int j = 0;
+      j < trainData->labelDataArryLen;
+      j++)
+  {
     trainData->label[j] /= labelMaxAbs;  
   }
 
-  // -------------------------- 建構模型 --------------------------
+  // ----------------- 建構模型 --------------------
   Flag_ModelParameter modelPara;
   Flag_LayerSequence nnStructure[] = {
     { // 輸入層
@@ -83,20 +90,24 @@ void setup() {
       .neurons =  1, 
       .activationType = model.ACTIVATION_RELU
     }
-  };      
+  };
+
   modelPara.layerSeq = nnStructure;  
-  modelPara.layerSize = FLAG_MODEL_GET_LAYER_SIZE(nnStructure);
+  modelPara.layerSize = 
+    FLAG_MODEL_GET_LAYER_SIZE(nnStructure);
   modelPara.inputLayerPara = 
-    FLAG_MODEL_2D_INPUT_LAYER_DIM(trainData->featureDim);
+    FLAG_MODEL_2D_INPUT_LAYER_DIM(
+      trainData->featureDim
+    );
   modelPara.lossFuncType  = model.LOSS_FUNC_MSE;
   modelPara.optimizerPara = {
     .optimizerType = model.OPTIMIZER_ADAM, 
     .learningRate = 0.001, 
-    .epochs = 3000
+    .epochs = 2000
   };
   model.begin(&modelPara);
 
-  // -------------------------- 訓練模型 --------------------------
+  // ----------------- 訓練模型 --------------------
   // 創建訓練用的特徵張量
   uint16_t train_feature_shape[] = {
     trainData->dataLen, 
@@ -120,16 +131,20 @@ void setup() {
   ); 
 
   // 訓練模型 
-  model.train(&train_feature_tensor, &train_label_tensor);
+  model.train(
+    &train_feature_tensor, 
+    &train_label_tensor
+  );
 
   // 匯出模型
-  model.save();
+  model.save(mean, sd, labelMaxAbs);
 }
 
 void loop() {
-  // -------------------------- 評估模型 --------------------------
+  // ----------------- 評估模型 --------------------
   // 測試資料預處理
-  float test_feature_data = (hx711.getWeight() - mean) / sd;
+  float test_feature_data = 
+    (hx711.getWeight() - mean) / sd;
 
   // 模型預測
   uint16_t test_feature_shape[] = {
@@ -141,12 +156,18 @@ void loop() {
     &test_feature_data
   );
   aitensor_t *test_output_tensor;
-  float predictVal;
   
-  test_output_tensor = model.predict(&test_feature_tensor);
+  test_output_tensor = model.predict(
+    &test_feature_tensor
+  );
   
   // 輸出預測結果
-  model.getResult(test_output_tensor, labelMaxAbs, &predictVal);
+  float predictVal;
+  model.getResult(
+    test_output_tensor,
+    labelMaxAbs, 
+    &predictVal
+  );
   Serial.print("預測值: ");
   Serial.print(predictVal, 1);
   Serial.println("g");

@@ -3,7 +3,7 @@
 */
 #include <Flag_HX711.h>
 
-#define DATA_LEN 50
+#define DATA_LEN 10
 
 // ------------全域變數------------
 // 感測器的物件
@@ -23,12 +23,12 @@ void setup() {
   // 歸零調整
   hx711.tare();  
 
-  // ------------------------- 蒐集資料 -------------------------
+  // -------------------- 蒐集資料 --------------------
   for(int i = 0; i < DATA_LEN; i++){
     // 放置物件與記錄標準電子秤測量到的重量 (標籤資料)
-    Serial.print(
-      "請在電子秤模組上放置物件, 並輸入標準電子秤測量到的重量 (標籤): "
-    );
+    Serial.print("請在電子秤模組上放置物件, ");
+    Serial.print("並輸入標準電子秤測量到的重量 (標籤): ");
+    
     while(!Serial.available()); // 等待使用者輸入
     String str = Serial.readStringUntil('\n');
     dataTable[i][1] = str.toFloat();

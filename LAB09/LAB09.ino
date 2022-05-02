@@ -3,8 +3,7 @@
 */
 #include "./inc/bitmap.h"
 #include <Wire.h>
-#include <Adafruit_GFX.h>
-#include <Adafruit_SSD1306.h>
+#include <Flag_UI.h>
 #include <Flag_Switch.h>
 
 #define PAGE_TOTAL 3
@@ -18,104 +17,43 @@ Adafruit_SSD1306 display(
 );
 
 // 感測器的物件
-Flag_Switch nextBtn(39);
-Flag_Switch prevBtn(34);
+Flag_Switch prevBtn(18, INPUT_PULLDOWN);
+Flag_Switch nextBtn(19, INPUT_PULLDOWN);
 
 // UI 會用到的參數
 uint8_t currentPage;
 bool btnNextPressed;
 bool btnPrevPressed;
+
+Flag_UI_Bitmap banner = Flag_UI_Bitmap(
+  0, 0, 128, 16, WHITE,bitmap_banner_background
+);
+Flag_UI_Bitmap btnL = Flag_UI_Bitmap(
+  0, 26, 16, 27, WHITE, bitmap_left_btn
+);
+Flag_UI_Bitmap btnR = Flag_UI_Bitmap(
+  112, 26, 16, 27, WHITE, bitmap_right_btn
+);
+Flag_UI_Text flashTxt = Flag_UI_Text(
+  35, 0, 2, BLACK, WHITE, "Flash"
+);
+Flag_UI_Text heartTxt = Flag_UI_Text(
+  35, 0, 2, BLACK, WHITE, "Heart"
+);
+Flag_UI_Text starTxt = Flag_UI_Text(
+  35, 0, 2, BLACK, WHITE, "Star"
+);
+Flag_UI_Bitmap flashPic = Flag_UI_Bitmap(
+  42, 18, 44, 44, WHITE, bitmap_flash
+);
+Flag_UI_Bitmap heartPic = Flag_UI_Bitmap(
+  42, 18, 44, 44, WHITE, bitmap_heart
+);
+Flag_UI_Bitmap starPic = Flag_UI_Bitmap(
+  42, 18, 44, 44, WHITE, bitmap_star
+);
+Flag_UI_Page page1, page2, page3;
 // -------------------------------
-  
-//------第 1 頁------
-void drawPage1(){
-  display.clearDisplay();
-
-  // 設定各元件參數
-  // 第 1 頁的橫幅背景 
-  display.drawBitmap(
-    0, 0, 
-    bitmap_banner_background, 
-    128, 16, 
-    WHITE
-  );
-  
-  // 第 1 頁的橫幅文字
-  display.setTextSize(2);
-  display.setCursor(35, 0);
-  display.setTextColor(BLACK, WHITE);
-  display.println("Flash");
-
-  // 第 1 頁的右鍵
-  display.drawBitmap(112, 26, bitmap_right_btn, 16, 27, WHITE);
-
-  // 第 1 頁的照片
-  display.drawBitmap(42, 18, bitmap_flash, 44, 44, WHITE);
-
-  // 顯示畫面
-  display.display();
-}
-
-//------第 2 頁------
-void drawPage2(){
-  display.clearDisplay();
-
-  // 設定各元件參數
-  // 第 2 頁的橫幅背景 
-  display.drawBitmap(
-    0, 0, 
-    bitmap_banner_background, 
-    128, 16, 
-    WHITE
-  );
-  
-  // 第 2 頁的橫幅文字
-  display.setTextSize(2);
-  display.setCursor(35, 0);
-  display.setTextColor(BLACK, WHITE);
-  display.println("Heart");
-
-  // 第 2 頁的左鍵
-  display.drawBitmap(0, 26, bitmap_left_btn, 16, 27, WHITE);
-
-  // 第 2 頁的右鍵
-  display.drawBitmap(112, 26, bitmap_right_btn, 16, 27, WHITE);
-
-  // 第 2 頁的照片
-  display.drawBitmap(42, 18, bitmap_heart, 44, 44, WHITE); 
-
-  // 顯示畫面
-  display.display();
-}
-
-//------第 3 頁------
-void drawPage3(){
-  display.clearDisplay();
-
-  // 設定各元件參數
-  // 第 3 頁的橫幅背景 
-  display.drawBitmap(
-    0, 0, 
-    bitmap_banner_background, 
-    128, 16, 
-    WHITE
-  );
-  
-  // 第 3 頁的橫幅文字
-  display.setTextSize(2);
-  display.setCursor(45, 0);
-  display.setTextColor(BLACK, WHITE);
-  display.println("Star");
-
-  // 第 3 頁的左鍵
-  display.drawBitmap(0, 26, bitmap_left_btn, 16, 27, WHITE); 
-
-  // 第 3 頁的照片
-  display.drawBitmap(42, 18, bitmap_star, 44, 44, WHITE); 
-
-  // 顯示畫面
-  display.display();
-}
 
 void setup(){
   // 序列埠設置
@@ -131,6 +69,19 @@ void setup(){
   currentPage = 1;
   btnNextPressed = false;
   btnPrevPressed = false;
+  
+  // 第 1 頁
+  page1.addWidget(&banner); page1.addWidget(&flashTxt);
+  page1.addWidget(&btnR);   page1.addWidget(&flashPic);
+
+  // 第 2 頁
+  page2.addWidget(&banner); page2.addWidget(&heartTxt);
+  page2.addWidget(&btnL);   page2.addWidget(&btnR);
+  page2.addWidget(&heartPic);
+
+  // 第 3 頁
+  page3.addWidget(&banner); page3.addWidget(&starTxt);
+  page3.addWidget(&btnL);   page3.addWidget(&starPic);
 }
 
 void loop(){
@@ -156,8 +107,8 @@ void loop(){
   
   // 繪製畫面
   switch(currentPage){
-    case 1: drawPage1(); break;
-    case 2: drawPage2(); break;
-    case 3: drawPage3(); break;
+    case 1: page1.show(); break;
+    case 2: page2.show(); break;
+    case 3: page3.show(); break;
   }
 }

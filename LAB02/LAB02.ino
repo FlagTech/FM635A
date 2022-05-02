@@ -142,11 +142,10 @@ void setup() {
       1, // 每次測試一筆資料
       testData->featureDim
     }; 
-    aitensor_t test_feature_tensor = 
-      AITENSOR_2D_F32(
-        test_feature_shape, 
-        &testData->feature[i]
-      );
+    aitensor_t test_feature_tensor = AITENSOR_2D_F32(
+      test_feature_shape, 
+      &testData->feature[i]
+    );
     aitensor_t *test_output_tensor;
     
     test_output_tensor = model.predict(

@@ -90,6 +90,10 @@ class Flag_Model {
       MODE_CATEGORICAL,
     };
     
+    float mean;
+    float sd;
+    float labelMaxAbs;
+    uint16_t inputLayerDim;
     //Flag_Model建構子
     Flag_Model(){
       _debugInfoType = INFO_BASE;
@@ -97,6 +101,11 @@ class Flag_Model {
       _heapRecCurrent = NULL;
       _denseListHead = NULL;
       _denseListCurrent = NULL;
+
+      this->mean = 0;
+      this->sd = 0;
+      this->labelMaxAbs = 0;
+      this->inputLayerDim = 0;
     }
     
     //Funtion Name: debugInfoTypeConfig
@@ -189,8 +198,8 @@ class Flag_Model {
     void begin(Flag_ModelParameter *para){
       //底下亂樹種子不得在model的constructor做, 會出事
       //重要!!! AIfES 需要隨機權重進行訓練
-      randomSeed(analogRead(A0));
-      uint16_t randSeed = 200 + random(800); // 這裡的隨機種子是由類比引腳的雜訊產生亂數種子
+      randomSeed(analogRead(A0));  // 這裡的隨機種子是由類比引腳的雜訊產生亂數種子
+      uint16_t randSeed = 300 + random(600);
       srand(randSeed); 
       rand(); // 依據先前所設定的亂數種子來取亂數
       
@@ -551,12 +560,15 @@ class Flag_Model {
       }
     }
 
-    void save(String fileName = "model.json"){
+    void save(float mean = 0.0, float sd = 0.0, float labelMaxAbs = 0.0){
       //依據DenseList從Head開始遍歷所有layer來創建json
       _denseListCurrent = _denseListHead;
  
       DynamicJsonDocument doc(heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
       
+      doc["mean"] = mean;
+      doc["sd"] = sd;
+      doc["labelMaxAbs"] = labelMaxAbs;
       int layer = 0;
       while(1){
         if(_denseListCurrent->layerType == LAYER_INPUT){
@@ -737,7 +749,10 @@ class Flag_Model {
       // get Json object; 這裡doc是local var依據官方說法, 函數返回時, 該doc物件被銷毀時自動會釋放掉所占用的heap, 實測沒問題
       DynamicJsonDocument doc(heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));    // 到https://arduinojson.org/v6/assistant/來評估要留多少的RAM空間, 理論上model.json裏頭要包含這個訊息好動態配置記憶體
       deserializeJson(doc, jsonFileStr); // str -> json obj
-
+      
+      this->mean = (float) doc["mean"];
+      this->sd = (float) doc["sd"];
+      this->labelMaxAbs = (float) doc["labelMaxAbs"];
       // print出多少層
       if(_debugInfoType <= INFO_SIMPLE){
         Serial.print(F("How much layers of ANN : "));
@@ -780,6 +795,7 @@ class Flag_Model {
           //設定input layer shape
           input_layer_shape[0] = 1;                                                  //第一個元素參考官方範例, 固定為1
           input_layer_shape[1] = (uint16_t)doc["layers"][i]["batch_input_shape"][1]; //第二個元素為train_feature_tensor.shape[1], 即訓練data的dim(維度)
+          this->inputLayerDim = input_layer_shape[1];
 
           //設定input layer
           input_layer->input_dim = 2;                    // Definition of the input dimension (Must fit to the input tensor) 官方舉例CNN會到2以上

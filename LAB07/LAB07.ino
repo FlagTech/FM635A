@@ -1,11 +1,11 @@
 /*
-  讀取按壓開關狀態
+  讀取按鈕開關狀態
 */
 #include <Flag_Switch.h>
 
 // ------------全域變數------------
 // 按鈕開關物件
-Flag_Switch btn(39);
+Flag_Switch btn(18, INPUT_PULLDOWN);
 
 void setup() {
   // 腳位設置

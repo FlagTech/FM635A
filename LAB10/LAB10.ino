@@ -7,7 +7,6 @@
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
 #include <Flag_Switch.h>
-#include <Flag_DataReader.h>
 #include <Flag_Model.h>
 #include <Flag_HX711.h>
 #include <WiFiClientSecure.h>
@@ -20,12 +19,6 @@
 enum{ RICE, FISH, MILK, VEGETABLE, FRUIT };
 
 // ------------全域變數------------
-// 讀取資料的物件
-Flag_DataReader reader;
-
-// 指向存放資料的指位器
-Flag_DataBuffer *data;
-
 // 神經網路模型
 Flag_Model model; 
 
@@ -37,8 +30,8 @@ Adafruit_SSD1306 display(
 );
 
 // 感測器的物件
-Flag_Switch btnPage(39);
-Flag_Switch btnRec(34);
+Flag_Switch btnPage(18, INPUT_PULLDOWN);
+Flag_Switch btnRec(19, INPUT_PULLDOWN);
 Flag_HX711 hx711(32, 33); // SCK, DT
 
 // 連網會用到的參數
@@ -53,11 +46,6 @@ String encodeTbl[] = {
   "%e8%94%ac%e8%8f%9c%e9%a1%9e",
   "%e6%b0%b4%e6%9e%9c%e9%a1%9e"
 };
-
-// 資料預處理會用到的參數
-float mean;
-float sd;
-float labelMaxAbs;
 
 // UI 會用到的參數
 uint8_t currentPage;
@@ -112,7 +100,7 @@ void utilities(uint8_t item, float weight, float *total){
   display.setTextColor(WHITE, BLACK);
   display.print("Current:");
   display.setCursor(48, 30);
-  display.print(weight);
+  display.print(weight, 1);
   display.print("g");
 
   // 總重量   
@@ -121,7 +109,7 @@ void utilities(uint8_t item, float weight, float *total){
   display.setTextColor(WHITE, BLACK);
   display.print("Total:");
   display.setCursor(48, 54);
-  display.print(*total);
+  display.print(*total, 1);
   display.print("g");
 
   // 偵測記錄按鈕
@@ -321,21 +309,6 @@ void setup(){
   btnPagePressed = false;
   btnRecPressed = false;
 
-  // 迴歸類型的訓練資料讀取
-  data = reader.read(
-    "/dataset/weight.txt", 
-    reader.MODE_REGRESSION
-  );
-
-  // 取得訓練特徵資料的平均值
-  mean = data->featureMean;
-
-  // 取得訓練特徵資料的標準差
-  sd = data->featureSd;
-
-  // 取得最大訓練標籤資料的絕對值
-  labelMaxAbs = data->labelMaxAbs; 
-        
   // -------------------------- 建構模型 --------------------------
   // 讀取已訓練好的模型檔
   model.begin("/weight_model.json");
@@ -344,12 +317,12 @@ void setup(){
 void loop(){
   // -------------------------- 即時預測 --------------------------
   // 測試資料預處理
-  float test_feature_data = (hx711.getWeightAsync() - mean) / sd;
+  float test_feature_data = (hx711.getWeightAsync() - model.mean) / model.sd;
    
   // 模型預測
   uint16_t test_feature_shape[] = {
     1, // 每次測試一筆資料
-    data->featureDim
+    model.inputLayerDim
   }; 
   aitensor_t test_feature_tensor = AITENSOR_2D_F32(
     test_feature_shape, 
@@ -375,8 +348,8 @@ void loop(){
   
   // 輸出預測結果
   Serial.print("重量: ");
-  model.getResult(test_output_tensor, labelMaxAbs, &predictVal);
-  Serial.print(predictVal); 
+  model.getResult(test_output_tensor, model.labelMaxAbs, &predictVal);
+  Serial.print(predictVal, 1); 
   Serial.println('g');
   
   switch(currentPage - 1){
