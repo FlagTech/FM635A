@@ -11,8 +11,8 @@
 // adc = f(weight) = gain * weight + offset
 // gain與offset使用2點校正法獲得
 // -----------------------------------------
-#define FLAG_HX711_DEFAULT_GAIN     (-2117.48)
-#define FLAG_HX711_DEFAULT_OFFSET   (-195250)
+#define FLAG_HX711_DEFAULT_GAIN     (2117.48)
+#define FLAG_HX711_DEFAULT_OFFSET   (195250)
 
 // 這是為了方便教學神經網路而調整的, 其實電子秤本身的<weight-adc>就足夠線性
 #define FLAG_HX711_ADJ_GAIN   0.97

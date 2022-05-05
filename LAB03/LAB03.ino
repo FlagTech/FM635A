@@ -15,7 +15,7 @@ void setup() {
   // HX711 初始化
   hx711.begin();
 
-  // 歸零調整
+  // 扣重調整
   hx711.tare();
 }
 

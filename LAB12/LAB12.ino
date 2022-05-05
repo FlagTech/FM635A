@@ -46,7 +46,9 @@ void setup() {
 
 void loop(){
   uint8_t proximity_data = 0;
-  uint16_t red_light = 0, green_light = 0, blue_light = 0;
+  uint16_t red_light = 0;
+  uint16_t green_light = 0;
+  uint16_t blue_light = 0;
   uint16_t ambient_light = 0;
 
   // 接近測試
