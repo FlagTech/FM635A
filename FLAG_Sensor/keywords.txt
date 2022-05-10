@@ -11,3 +11,4 @@ Flag_Task	KEYWORD1
 Flag_TaskManager	KEYWORD1
 Flag_DataExporter	KEYWORD1
 Flag_HX711	KEYWORD1
+Flag_UI	KEYWORD1

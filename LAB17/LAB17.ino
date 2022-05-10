@@ -7,25 +7,25 @@
 
 // 1 個週期 (PERIOD) 取 MPU6050 的 6 個參數 (SENSOR_PARA)
 // 每 10 個週期 (PERIOD) 為一筆特徵資料
-// 3 種手勢各取 30 筆 (ROUND)
+// 3 種手勢各取 20 筆 (ROUND)
 #define CLASS_TOTAL 3 
 #define SENSOR_PARA 6
 #define PERIOD 10
-#define ROUND 30
+#define ROUND 10
 #define FEATURE_DIM (PERIOD * SENSOR_PARA)
 #define FEATURE_LEN (FEATURE_DIM * ROUND * CLASS_TOTAL)
 
 //------------全域變數------------
 // 感測器的物件
 Flag_MPU6050 mpu6050;
-Flag_Switch collectBtn(39);
+Flag_Switch collectBtn(18);
 
 // 匯出蒐集資料會用的物件
 Flag_DataExporter exporter;
 
 // 蒐集資料會用到的參數
 float sensorData[FEATURE_LEN]; 
-uint32_t sensorArrayIndex = 0, lastArrayIndex = 0;
+uint32_t sensorArrayIdx = 0, lastArrayIdx = 0;
 uint32_t collectFinishedCond = 0;
 uint32_t lastMeaureTime = 0;
 uint32_t dataCnt = 0;
@@ -55,7 +55,8 @@ void loop(){
       // MPU6050 資料更新  
       mpu6050.update();
 
-      // 連續取 10 個週期作為一筆特徵資料, 也就是一秒會取到一筆特徵資料
+      // 連續取 10 個週期作為一筆特徵資料, 
+      // 也就是一秒會取到一筆特徵資料
       if(collectFinishedCond == PERIOD){
         // 取得一筆特徵資料
         dataCnt++;
@@ -63,14 +64,15 @@ void loop(){
         Serial.print(dataCnt);
         Serial.println("筆資料蒐集已完成");
 
-        // 每一種分類資料蒐集完都會提示該階段已蒐集完成的訊息
+        // 每種分類資料蒐集完都會提示該階段已蒐集完成的訊息
         for(int i = 0; i < CLASS_TOTAL; i++){
-          if(sensorArrayIndex == FEATURE_LEN / CLASS_TOTAL * (i+1)){
+          if(sensorArrayIdx == 
+              FEATURE_LEN / CLASS_TOTAL * (i+1)){
             Serial.print("手勢"); 
             Serial.print(i+1); 
             Serial.println("取樣完成");
             dataCnt = 0;
-            if(sensorArrayIndex == FEATURE_LEN){
+            if(sensorArrayIdx == FEATURE_LEN){
               // 匯出特徵資料字串
               exporter.dataExport(
                 sensorData, 
@@ -90,18 +92,18 @@ void loop(){
         // 放開按鈕進行下一筆資料收集
         while(collectBtn.read());
       }else{
-        sensorData[sensorArrayIndex] = mpu6050.data.accX; 
-        sensorArrayIndex++;
-        sensorData[sensorArrayIndex] = mpu6050.data.accY; 
-        sensorArrayIndex++;
-        sensorData[sensorArrayIndex] = mpu6050.data.accZ; 
-        sensorArrayIndex++;
-        sensorData[sensorArrayIndex] = mpu6050.data.gyrX; 
-        sensorArrayIndex++;
-        sensorData[sensorArrayIndex] = mpu6050.data.gyrY; 
-        sensorArrayIndex++;
-        sensorData[sensorArrayIndex] = mpu6050.data.gyrZ; 
-        sensorArrayIndex++;
+        sensorData[sensorArrayIdx] = mpu6050.data.accX; 
+        sensorArrayIdx++;
+        sensorData[sensorArrayIdx] = mpu6050.data.accY; 
+        sensorArrayIdx++;
+        sensorData[sensorArrayIdx] = mpu6050.data.accZ; 
+        sensorArrayIdx++;
+        sensorData[sensorArrayIdx] = mpu6050.data.gyrX; 
+        sensorArrayIdx++;
+        sensorData[sensorArrayIdx] = mpu6050.data.gyrY; 
+        sensorArrayIdx++;
+        sensorData[sensorArrayIdx] = mpu6050.data.gyrZ; 
+        sensorArrayIdx++;
         collectFinishedCond++;
       }
       lastMeaureTime = millis();
@@ -114,10 +116,10 @@ void loop(){
     collectFinishedCond = 0;
     
     // 若中途手放開按鈕, 則不足以形成一筆特徵資料
-    if(sensorArrayIndex % FEATURE_DIM != 0){
-      sensorArrayIndex = lastArrayIndex;
+    if(sensorArrayIdx % FEATURE_DIM != 0){
+      sensorArrayIdx = lastArrayIdx;
     }else{
-      lastArrayIndex = sensorArrayIndex;
+      lastArrayIdx = sensorArrayIdx;
     }
   }
 }

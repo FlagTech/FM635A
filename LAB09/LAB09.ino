@@ -17,8 +17,8 @@ Adafruit_SSD1306 display(
 );
 
 // 感測器的物件
-Flag_Switch prevBtn(18, INPUT_PULLDOWN);
-Flag_Switch nextBtn(19, INPUT_PULLDOWN);
+Flag_Switch prevBtn(18);
+Flag_Switch nextBtn(19);
 
 // UI 會用到的參數
 uint8_t currentPage;

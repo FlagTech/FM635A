@@ -5,7 +5,7 @@
 
 // ------------全域變數------------
 // 按鈕開關物件
-Flag_Switch btn(18, INPUT_PULLDOWN);
+Flag_Switch btn(18);
 
 void setup() {
   // 腳位設置

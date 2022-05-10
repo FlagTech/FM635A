@@ -29,8 +29,8 @@ Adafruit_SSD1306 display(
 );
 
 // 感測器的物件
-Flag_Switch btnPage(18, INPUT_PULLDOWN);
-Flag_Switch btnRec(19, INPUT_PULLDOWN);
+Flag_Switch btnPage(18);
+Flag_Switch btnRec(19);
 Flag_HX711  hx711(32, 33); // SCK, DT
 
 // UI 會用到的參數
@@ -88,7 +88,7 @@ Flag_UI_Page page[PAGE_TOTAL];
 // -------------------------------
 
 // 傳送 LINE 訊息
-void notify(uint8_t item, float value){
+void notify(uint8_t page, float totalWeight){
   String str[] = {
     "全穀雜糧類",
     "蛋豆魚肉類",
@@ -97,14 +97,15 @@ void notify(uint8_t item, float value){
     "水果類"
   };
   String ifttt_url = IFTTT_URL;
+  String url = ifttt_url + \
+    "?value1=" + urlEncode(str[page]) + \
+    "&value2=" + String(totalWeight, 1);
+
   HTTPClient http;
-  String https_get = ifttt_url + \
-    "?value1=" + urlEncode(str[item]) + \
-    "&value2=" + String(value, 1);
-  
-  http.begin(https_get);
+  http.begin(url);
   int httpCode = http.GET();
   if(httpCode < 0) Serial.println("連線失敗");
+  else             Serial.println("連線成功");
   http.end();
 }
 
@@ -139,6 +140,7 @@ void setup(){
 
   // 第 1 頁 ~ 第 5 頁
   for(uint8_t i = 0; i < PAGE_TOTAL; i++){
+    page[i].setDisplay(&display);
     page[i].addWidget(&banner);
     page[i].addWidget(&txt[i]);
     page[i].addWidget(&bitmap[i]);
@@ -148,13 +150,13 @@ void setup(){
     page[i].addWidget(&totalWeightTxt[i]);
   }
 
-  // -------------------------- 建構模型 --------------------------
+  // ----------------- 建構模型 --------------------
   // 讀取已訓練好的模型檔
   model.begin("/weight_model.json");
 }
 
 void loop(){
-  // -------------------------- 即時預測 --------------------------
+  // ----------------- 即時預測 --------------------
   // 測試資料預處理
   float test_feature_data = 
     (hx711.getWeightAsync() - model.mean) / model.sd;
@@ -214,5 +216,3 @@ void loop(){
   // 顯示畫面
   page[currentPage].show();
 }
-
-  

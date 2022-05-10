@@ -5,7 +5,7 @@
 
 class Flag_Switch {
   public:
-    Flag_Switch(uint8_t pinNum, uint8_t type = INPUT){
+    Flag_Switch(uint8_t pinNum, uint8_t type = INPUT_PULLDOWN){
       _stableTime = 20;
       _pinNum = pinNum;
       pinMode(_pinNum, type);

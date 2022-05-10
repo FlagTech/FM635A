@@ -7,29 +7,21 @@
 #include <Wire.h>
 #include <SparkFun_APDS9960.h>
 
-#define LED_ON  0
-#define LED_OFF 1
-
-// 取APDS9960的3個參數(SENSOR_PARA)為一筆特徵資料
-#define SENSOR_PARA 3
-#define FEATURE_DIM SENSOR_PARA
+// 取 APDS9960 的 3 個參數為一筆特徵資料
+#define FEATURE_DIM 3
 
 //------------全域變數------------
 // 讀取資料的物件
-Flag_DataReader reader;
-Flag_DataBuffer *data;
+Flag_DataReader trainDataReader;
+
+// 指向存放資料的指位器
+Flag_DataBuffer *trainData;
 
 // 神經網路模型
 Flag_Model model; 
 
 // 感測器的物件
 SparkFun_APDS9960 apds = SparkFun_APDS9960();
-
-// 訓練用的特徵資料
-float *train_feature_data;
-
-// 對應特徵資料的標籤值
-float *train_label_data;
 
 // 資料預處理會用到的參數
 float mean;
@@ -40,75 +32,121 @@ float sensorData[FEATURE_DIM];
 //--------------------------------
 
 void setup() {
-  // UART設置
+  // 序列埠設置
   Serial.begin(115200);
 
-  // 初始化APDS9960
-  if(apds.init()) Serial.println(F("APDS-9960初始化完成"));
-  else            Serial.println(F("APDS-9960初始化錯誤"));
-  
-  // 啟用APDS-9960光傳感器
-  if(apds.enableLightSensor(false)) Serial.println(F("光傳感器正在運行"));
-  else                              Serial.println(F("光傳感器初始化錯誤"));
-  
-  // 調整接近傳感器增益
-  if(!apds.setProximityGain(PGAIN_2X)) Serial.println(F("設置PGAIN時出現問題"));
-  
-  // 啟用APDS-9960接近傳感器
-  if(apds.enableProximitySensor(false)) Serial.println(F("接近傳感器正在運行"));
-  else                                  Serial.println(F("傳感器初始化錯誤"));
-  
-  // GPIO設置
-  pinMode(LED_BUILTIN, OUTPUT);
-  digitalWrite(LED_BUILTIN, LED_OFF);
-
-  // 多元分類類型的資料讀取
-  data = reader.read("/dataset/red.txt,/dataset/blue.txt,/dataset/yellow.txt", reader.MODE_CATEGORICAL);
-  
-  // 設定訓練用的特徵資料
-  train_feature_data = data->feature;
-
-  // 設定對應特徵資料的標籤值
-  train_label_data = data->label;
-
-  // 取得特徵資料的平均值
-  mean = data->featureMean;
-
-  // 取得特徵資料的標準差
-  sd = data->featureSd;
-        
-  // 特徵資料正規化: 標準差法
-  for(int j = 0; j < data->featureDataArryLen; j++){
-    train_feature_data[j] = (train_feature_data[j] - mean) / sd;
+  // 初始化 APDS9960
+  if(apds.init()){
+    Serial.println("APDS-9960 初始化完成");
+  }else{
+    Serial.println("APDS-9960 初始化錯誤");
   }
 
-  Serial.println(F("----- 顏色辨識模型訓練 -----"));
-  Serial.println();
+  // 啟用 APDS-9960 光感測器
+  if(apds.enableLightSensor(false)){
+    Serial.println("光感測器正在運行");
+  }else{
+    Serial.println("光感測器初始化錯誤");
+  }
 
-  // -------------------------- 建構模型 --------------------------
-  uint32_t classNum = reader.getNumOfFiles();
+  // 啟用 APDS-9960 接近感測器
+  if(apds.enableProximitySensor(false)){
+    Serial.println("接近感測器正在運行");
+  }else{ 
+    Serial.println("接近感測器初始化錯誤");
+  }
+  
+  // 腳位設置
+  pinMode(LED_BUILTIN, OUTPUT);
+  digitalWrite(LED_BUILTIN, HIGH);
+
+  // ----------------- 資料預處理 ------------------
+  // 多元分類類型的資料讀取
+  trainData = trainDataReader.read(
+    "/dataset/unripe.txt,/dataset/ripe.txt", 
+    trainDataReader.MODE_BINARY
+  );
+ 
+  // 取得特徵資料的平均值
+  mean = trainData->featureMean;
+
+  // 取得特徵資料的標準差
+  sd = trainData->featureSd;
+        
+  // 特徵資料正規化: 標準差法
+  for(int j = 0;
+      j < trainData->featureDataArryLen;
+      j++)
+  {
+    trainData->feature[j] = 
+      (trainData->feature[j] - mean) / sd;
+  }
+
+  // ----------------- 建構模型 --------------------
   Flag_ModelParameter modelPara;
-  Flag_LayerSequence nnStructure[] = {{.layerType = model.LAYER_INPUT, .neurons =  0,       .activationType = model.ACTIVATION_NONE},     // input layer
-                                      {.layerType = model.LAYER_DENSE, .neurons = 10,       .activationType = model.ACTIVATION_RELU},     // hidden layer
-                                      {.layerType = model.LAYER_DENSE, .neurons = classNum, .activationType = model.ACTIVATION_SOFTMAX}}; // output layer
-  modelPara.inputLayerPara = FLAG_MODEL_2D_INPUT_LAYER_DIM(data->featureDim);
-  modelPara.layerSize = FLAG_MODEL_GET_LAYER_SIZE(nnStructure);
+  Flag_LayerSequence nnStructure[] = {
+    { // 輸入層
+      .layerType = model.LAYER_INPUT,
+      .neurons =  0,
+      .activationType = model.ACTIVATION_NONE
+    },
+    { // 第 1 層隱藏層
+      .layerType = model.LAYER_DENSE, 
+      .neurons = 5, 
+      .activationType = model.ACTIVATION_RELU
+    },
+    { // 第 2 層隱藏層 
+      .layerType = model.LAYER_DENSE, 
+      .neurons = 10, 
+      .activationType = model.ACTIVATION_RELU
+    },
+    {
+      .layerType = model.LAYER_DENSE,
+      .neurons = 1,
+      .activationType = model.ACTIVATION_SIGMOID
+    }
+  };
   modelPara.layerSeq = nnStructure;
-  modelPara.lossFuncType  = model.LOSS_FUNC_CORSS_ENTROPY;
-  modelPara.optimizerPara = {.optimizerType = model.OPTIMIZER_ADAM, .learningRate = 0.001, .epochs = 1900, .batch_size = 20};
+  modelPara.layerSize = 
+    FLAG_MODEL_GET_LAYER_SIZE(nnStructure);
+  modelPara.inputLayerPara = 
+    FLAG_MODEL_2D_INPUT_LAYER_DIM(
+      trainData->featureDim
+    );
+  modelPara.lossFuncType  = model.LOSS_FUNC_MSE;
+  modelPara.optimizerPara = {
+    .optimizerType = model.OPTIMIZER_ADAM,
+    .learningRate = 0.001,
+    .epochs = 2000
+  };
   model.begin(&modelPara);
 
-  // -------------------------- 訓練模型 --------------------------
+  // ----------------- 訓練模型 --------------------
   // 創建訓練用的特徵張量
-  uint16_t train_feature_shape[] = {data->dataLen, data->featureDim};
-  aitensor_t train_feature_tensor = AITENSOR_2D_F32(train_feature_shape, train_feature_data);
+  uint16_t train_feature_shape[] = {
+    trainData->dataLen, 
+    trainData->featureDim
+  };
+  aitensor_t train_feature_tensor = AITENSOR_2D_F32(
+    train_feature_shape,
+    trainData->feature
+  );
 
   // 創建訓練用的標籤張量
-  uint16_t train_label_shape[] = {data->dataLen, data->labelDim}; 
-  aitensor_t train_label_tensor = AITENSOR_2D_F32(train_label_shape, train_label_data); 
+  uint16_t train_label_shape[] = {
+    trainData->dataLen, 
+    trainData->labelDim
+  }; 
+  aitensor_t train_label_tensor = AITENSOR_2D_F32(
+    train_label_shape, 
+    trainData->label
+  ); 
 
   // 訓練模型 
-  model.train(&train_feature_tensor, &train_label_tensor);
+  model.train(
+    &train_feature_tensor,
+    &train_label_tensor
+  );
   
   // 匯出模型
   model.save();
@@ -116,7 +154,10 @@ void setup() {
 
 void loop(){
   uint8_t proximity_data = 0;
-  uint16_t red_light = 0,green_light = 0,blue_light = 0, ambient_light = 0;
+  uint16_t red_light = 0;
+  uint16_t green_light = 0;
+  uint16_t blue_light = 0;
+  uint16_t ambient_light = 0;
 
   if(!apds.readProximity(proximity_data)){
     Serial.println("此次讀取接近值錯誤");
@@ -125,7 +166,7 @@ void loop(){
   // 當開始蒐集資料的條件達成時, 開始蒐集
   if (proximity_data == 255) {
     // 蒐集資料時, 內建指示燈會亮
-    digitalWrite(LED_BUILTIN, LED_ON);
+    digitalWrite(LED_BUILTIN, LOW);
 
     // 偵測是否要開始蒐集資料
     if(!apds.readAmbientLight(ambient_light)  ||
@@ -155,35 +196,33 @@ void loop(){
       // 取得一筆特徵資料, 並使用訓練好的模型來預測以進行評估
       float *eval_feature_data = sensorData; 
       uint16_t eval_feature_shape[] = {1, FEATURE_DIM};
-      aitensor_t eval_feature_tensor = AITENSOR_2D_F32(eval_feature_shape, eval_feature_data);
+      aitensor_t eval_feature_tensor = AITENSOR_2D_F32(
+        eval_feature_shape, 
+        eval_feature_data
+      );
       aitensor_t *eval_output_tensor;
-      float predictVal[model.getNumOfOutputs()];
+      float predictVal;
 
       // 測試資料預處理
       for(int i = 0; i < FEATURE_DIM ; i++){
-        eval_feature_data[i] = (eval_feature_data[i] - mean) / sd;
+        eval_feature_data[i] = 
+          (eval_feature_data[i] - mean) / sd;
       }
 
       // 模型預測
       eval_output_tensor = model.predict(&eval_feature_tensor);
-      model.getResult(eval_output_tensor, predictVal);
+      model.getResult(eval_output_tensor, &predictVal);
       
       // 輸出預測結果
-      Serial.print(F("預測結果: "));
-      model.printResult(predictVal);
+      Serial.print("預測結果: ");
 
       // 找到機率最大的索引值
-      uint8_t maxIndex = model.argmax(predictVal);
-      switch(maxIndex){
-        case 0:  Serial.println("紅色"); break;
-        case 1:  Serial.println("藍色"); break;
-        case 2:  Serial.println("黃色"); break;
-      }
+      Serial.println(predictVal);
       
       delay(1000);
     }
   } else {
     // 未蒐集資料時, 內建指示燈不亮
-    digitalWrite(LED_BUILTIN, LED_OFF);
+    digitalWrite(LED_BUILTIN, HIGH);
   }
 }
