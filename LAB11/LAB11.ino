@@ -1,5 +1,5 @@
 /*
-  色彩與接近偵測感測器
+  使用色彩與接近偵測感測器
 */
 #include <Wire.h>
 #include <SparkFun_APDS9960.h>
@@ -14,23 +14,17 @@ void setup() {
   Serial.begin(115200);
 
   // 初始化 APDS9960
-  if(apds.init()){
-    Serial.println("APDS-9960 初始化完成");
-  }else{
+  while(!apds.init()){
     Serial.println("APDS-9960 初始化錯誤");
   }
 
   // 啟用 APDS-9960 光感測器
-  if(apds.enableLightSensor(false)){
-    Serial.println("光感測器正在運行");
-  }else{
+  while(!apds.enableLightSensor()){
     Serial.println("光感測器初始化錯誤");
   }
 
   // 啟用 APDS-9960 接近感測器
-  if(apds.enableProximitySensor(false)){
-    Serial.println("接近感測器正在運行");
-  }else{ 
+  while(!apds.enableProximitySensor()){
     Serial.println("接近感測器初始化錯誤");
   }
   
@@ -48,7 +42,7 @@ void loop(){
 
   // 接近測試
   if(!apds.readProximity(proximity_data)){
-    Serial.println("此次讀取接近值錯誤");
+    Serial.println("讀取接近值錯誤");
   }
   Serial.print("接近值: ");
   Serial.println(proximity_data);

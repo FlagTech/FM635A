@@ -1,5 +1,5 @@
 /*
-  每日食物攝取紀錄--IFTTT
+  每日飲食攝取紀錄--IFTTT
 */
 #include "./inc/bitmap.h"
 #include <Wire.h>
@@ -97,8 +97,8 @@ void notify(uint8_t page, float totalWeight){
     "水果類"
   };
   String ifttt_url = IFTTT_URL;
-  String url = ifttt_url + \
-    "?value1=" + urlEncode(str[page]) + \
+  String url = ifttt_url + 
+    "?value1=" + urlEncode(str[page]) + 
     "&value2=" + String(totalWeight, 1);
 
   HTTPClient http;
@@ -127,7 +127,7 @@ void setup(){
 
   // Wi-Fi 設置
   WiFi.begin(AP_SSID, AP_PWD);
-  if(WiFi.status() != WL_CONNECTED) {
+  while(WiFi.status() != WL_CONNECTED) {
     Serial.print(".");
     delay(500);
   }
@@ -170,16 +170,14 @@ void loop(){
     test_feature_shape, 
     &test_feature_data
   );
-
   aitensor_t *test_output_tensor;
-  float predictVal;
 
-  // 模型預測
   test_output_tensor = model.predict(
     &test_feature_tensor
   );
   
   // 輸出預測結果
+  float predictVal;
   Serial.print("重量: ");
   model.getResult(
     test_output_tensor, 

@@ -1,205 +1,208 @@
 /*
-  手勢解鎖門禁
+  手勢解鎖門禁 - IFTTT
 */
-#include <Flag_DataReader.h>
 #include <Flag_Model.h>
 #include <Flag_MPU6050.h>
 #include <Flag_Switch.h>
-#include <ESP32_Servo.h>
+#include <ESP32Servo.h>
+#include <WiFi.h>
+#include <HTTPClient.h>
 
-#define LED_ON  0
-#define LED_OFF 1
-#define LOCK 180
+#define AP_SSID    "Xperia XZ Premium_db49"
+#define AP_PWD     "12345678"
+#define IFTTT_URL  "https://maker.ifttt.com/trigger/gesture/with/key/dg9J7YHL0mMuDaaRGs9pNU"
+
+// 定義 0 度解鎖, 90 度上鎖
+#define LOCK 90
 #define UNLOCK 0
-#define COLLECT_BTN_PIN 39
-#define LOCK_BTN_PIN 34
-#define SERVO_PIN 33
 
-// 1個週期(PERIOD)取MPU6050的6個參數(SENSOR_PARA)
-// 每10個週期(PERIOD)為一筆特徵資料
-#define PERIOD 10
+// 1 個週期取 MPU6050 的 6 個參數
+// 每 10 個週期為一筆特徵資料
 #define SENSOR_PARA 6
-#define FEATURE_DIM (PERIOD * SENSOR_PARA)
+#define PERIOD 10
 
 //------------全域變數------------
-// 讀取資料的物件
-Flag_DataReader reader;
-Flag_DataBuffer *data;
-
 // 神經網路模型
 Flag_Model model; 
 
 // 感測器的物件
 Flag_MPU6050 mpu6050;
-Flag_Switch collectBtn(COLLECT_BTN_PIN, INPUT);
-Flag_Switch lockBtn(LOCK_BTN_PIN, INPUT);
+Flag_Switch collectBtn(19);
+Flag_Switch lockBtn(18);
 
 // 伺服馬達物件
 Servo servo;
 
-// 資料預處理會用到的參數
-float mean;
-float sd;
-
 // 即時預測會用到的參數
-float sensorData[FEATURE_DIM];
-uint32_t sensorArrayIndex = 0;
-uint32_t collectFinishedCond = 0;
-uint32_t lastMeaureTime = 0;
+float sensorData[PERIOD * SENSOR_PARA];
+uint32_t sensorArrayIdx;
+uint32_t collectFinishedCond;
+uint32_t lastMeasTime;
 //--------------------------------
 
-// 檢查密碼 : 213
-uint8_t pwdCheck(uint8_t gesture, float threshold){
-  // 信心度的臨界值
-  #define THRESHOLD_VAL 0.75
+// 傳送 LINE 訊息
+void notify(){
+  String ifttt_url = IFTTT_URL;
+
+  HTTPClient http;
+  http.begin(ifttt_url);
+  int httpCode = http.GET();
+  if(httpCode < 0) Serial.println("連線失敗");
+  else             Serial.println("連線成功");
+  http.end();
+}
+
+// 密碼檢查
+void pwdCheck(uint8_t gesture){
+  // 密碼 : 213
+  uint8_t pwd[] = {2, 1, 3}; 
 
   // 狀態
-  enum{
-    FIRST_WORD,
-    SECOND_WORD,
-    THIRD_WORD
-  };
+  enum{FIRST_WORD,SECOND_WORD,THIRD_WORD,TOTAL_STATE};
 
   // 狀態變數
   static uint8_t state = FIRST_WORD;
 
   // 狀態機
-  switch(state){
-    case FIRST_WORD:
-      if(gesture == 2 && threshold >= THRESHOLD_VAL) {
-        Serial.print(2);
-        state++;
-        return 1; 
-      }else{          
-        state = FIRST_WORD;
-        return 0; 
-      }  
-      break;
-
-    case SECOND_WORD:
-      if(gesture == 1 && threshold >= THRESHOLD_VAL) {
-        Serial.print(1);
-        state++;
-        return 1; 
-      }else{            
-        state = FIRST_WORD;
-        return 0; 
-      }  
-      break;
-
-    case THIRD_WORD:
-      if(gesture == 3 && threshold >= THRESHOLD_VAL) {
-        Serial.println(3);
-        Serial.println("解鎖成功");
-        servo.write(UNLOCK);
-        state = FIRST_WORD;
-        return 1;
-      }else{     
-        state = FIRST_WORD;  
-        return 0;     
-      } 
-      break;
-
-    default:
-      state = FIRST_WORD; 
-      return 0;
+  if(gesture == pwd[state]) {
+    state++;
+    if(state == TOTAL_STATE){
+      Serial.println("解鎖成功");
+      servo.write(UNLOCK);
+      notify();
+      state = FIRST_WORD;
+    }
+  }else{
+    Serial.println("輸入密碼錯誤, 請重新輸入");
+    state = FIRST_WORD;
   }
 }
 
 void setup() {
-  // UART設置
+  // 序列埠設置
   Serial.begin(115200);
 
-  // mpu6050設置
+  // MPU6050 初始化
   mpu6050.init();
   while(!mpu6050.isReady()); 
 
-  // GPIO設置
-  pinMode(LED_BUILTIN, OUTPUT);
-  digitalWrite(LED_BUILTIN, LED_OFF);
+  // 設定伺服馬達的接腳
+  servo.attach(33, 500, 2400);
+  servo.write(LOCK);
   
-  // Servo設置
-  servo.attach(SERVO_PIN, 500, 2400); // 設定伺服馬達的接腳
+  // 腳位設置
+  pinMode(LED_BUILTIN, OUTPUT);
+  digitalWrite(LED_BUILTIN, HIGH);
+  
+  // Wi-Fi 設置
+  WiFi.begin(AP_SSID, AP_PWD);
+  while(WiFi.status() != WL_CONNECTED) {
+    Serial.print(".");
+    delay(500);
+  }
+  Serial.println("\n成功連上基地台!");
 
-  // 多元分類類型的資料讀取
-  data = reader.read("/dataset/one.txt,/dataset/two.txt,/dataset/three.txt", reader.MODE_CATEGORICAL); //注意讀檔案順序分別對應到one-hot encoding
+  // 清除蒐集資料會用到的參數
+  sensorArrayIdx = 0;
+  collectFinishedCond = 0;
+  lastMeasTime = 0;
 
-  // 取得特徵資料的平均值
-  mean = data->featureMean;
-
-  // 取得特徵資料的標準差
-  sd = data->featureSd;
-
-  Serial.println(F("----- 手勢解鎖門禁 -----"));
-  Serial.println();
-
-  // -------------------------- 建構模型 --------------------------
+  // ----------------- 建構模型 --------------------
   // 讀取已訓練的模型檔
   model.begin("/gesture_model.json");
 }
 
 void loop() {
-  // -------------------------- 即時預測 --------------------------
-  // 當按鈕按下時開始收集資料   
+  // ----------------- 即時預測 --------------------
+  // 當按鈕按下時, 開始蒐集資料
   if(collectBtn.read()){
-    // 收集資料時, 內建指示燈會亮
-    digitalWrite(LED_BUILTIN, LED_ON);
+    // 蒐集資料時, 內建指示燈會亮
+    digitalWrite(LED_BUILTIN, LOW);
 
-    //100ms取一次, 共取10次, 也就是一秒
-    if(millis() - lastMeaureTime > 100){
-      //mpu6050資料更新  
+    // 每 100 毫秒為一個週期來取一次 MPU6050 資料
+    if(millis() - lastMeasTime > 100){
+      // MPU6050 資料更新
       mpu6050.update();
 
+      // 連續取 10 個週期作為一筆特徵資料, 
+      // 也就是一秒會取到一筆特徵資料
       if(collectFinishedCond == PERIOD){
-        // 使用訓練好的模型來預測
-        float *test_feature_data = sensorData; 
-        uint16_t test_feature_shape[] = {1, FEATURE_DIM};
-        aitensor_t test_feature_tensor = AITENSOR_2D_F32(test_feature_shape, test_feature_data);
-        aitensor_t *test_output_tensor;
-        float predictVal[model.getNumOfOutputs()];
-
         // 測試資料預處理
-        for(int i = 0; i < FEATURE_DIM ; i++){
-          test_feature_data[i] = (test_feature_data[i] - mean) / sd;
+        float *test_feature_data = sensorData;
+        for(int i = 0; i < model.inputLayerDim; i++){
+          test_feature_data[i] = 
+            (sensorData[i] - model.mean) / model.sd;
         }
 
         // 模型預測
-        test_output_tensor = model.predict(&test_feature_tensor);
-        model.getResult(test_output_tensor, predictVal);
+        uint16_t test_feature_shape[] = {
+          1, // 每次測試一筆資料
+          model.inputLayerDim
+        };
+        aitensor_t test_feature_tensor=AITENSOR_2D_F32(
+          test_feature_shape,
+          test_feature_data
+        );
+        aitensor_t *test_output_tensor;
+        test_output_tensor = model.predict(
+          &test_feature_tensor
+        );
 
-        // 找到機率最大的索引值
-        uint8_t indexOfMaxArg = model.argmax(predictVal);
-        
-        // 手寫密碼確認
-        uint8_t gesture = indexOfMaxArg + 1;
-        if(!pwdCheck(gesture, predictVal[indexOfMaxArg])){
-          Serial.println("\n輸入密碼錯誤"); 
+        // 輸出預測結果
+        float predictVal[model.getNumOfOutputs()];
+        model.getResult(
+          test_output_tensor,
+          predictVal
+        );
+        Serial.print("預測結果: ");
+        model.printResult(predictVal);
+
+        // 找到信心值最大的索引
+        uint8_t maxIndex = model.argmax(predictVal);
+        Serial.print("你寫的數字為: "); 
+        Serial.println(maxIndex + 1);
+
+        // 檢查密碼
+        uint8_t gesture = maxIndex + 1;
+        if(predictVal[maxIndex] >= 0.70){
+          pwdCheck(gesture);
+        }else{
+          Serial.println("信心值不夠, 不做密碼判定");
         }
-
-        // 當還按著按鈕則阻塞, 直到放開按鈕
-        while(collectBtn.read());
         
+        // 要先放開按鈕才能再做資料的蒐集
+        while(collectBtn.read());
       }else{
-        sensorData[sensorArrayIndex] = mpu6050.data.accX; sensorArrayIndex++;
-        sensorData[sensorArrayIndex] = mpu6050.data.accY; sensorArrayIndex++;
-        sensorData[sensorArrayIndex] = mpu6050.data.accZ; sensorArrayIndex++;
-        sensorData[sensorArrayIndex] = mpu6050.data.gyrX; sensorArrayIndex++;
-        sensorData[sensorArrayIndex] = mpu6050.data.gyrY; sensorArrayIndex++;
-        sensorData[sensorArrayIndex] = mpu6050.data.gyrZ; sensorArrayIndex++;
+        sensorData[sensorArrayIdx] = mpu6050.data.accX;
+        sensorArrayIdx++;
+        sensorData[sensorArrayIdx] = mpu6050.data.accY;
+        sensorArrayIdx++;
+        sensorData[sensorArrayIdx] = mpu6050.data.accZ;
+        sensorArrayIdx++;
+        sensorData[sensorArrayIdx] = mpu6050.data.gyrX;
+        sensorArrayIdx++;
+        sensorData[sensorArrayIdx] = mpu6050.data.gyrY;
+        sensorArrayIdx++;
+        sensorData[sensorArrayIdx] = mpu6050.data.gyrZ;
+        sensorArrayIdx++;
         collectFinishedCond++;
       }
-      lastMeaureTime = millis();
+      lastMeasTime = millis();
     }
   }else{
-    // 按鈕放開, 則代表資料要重新收集
-    digitalWrite(LED_BUILTIN, LED_OFF);
+    // 未蒐集資料時, 內建指示燈不亮
+    digitalWrite(LED_BUILTIN, HIGH);
+
+    // 按鈕放開, 則代表特徵資料要重新蒐集
     collectFinishedCond = 0;
-    sensorArrayIndex = 0;
+
+    // 若中途手放開按鈕, 則不足以形成一筆特徵資料
+    sensorArrayIdx = 0;
   }
 
-  // 上鎖
+  // 偵測上鎖按鈕
   if(lockBtn.read()){
     servo.write(LOCK);
-    delay(15); // 延遲一段時間，讓伺服馬達轉到定位。 
+    delay(15);
   }
 }

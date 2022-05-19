@@ -1,14 +1,10 @@
 /*
-  顏色辨識感測器 -- 訓練與評估
+  水果熟成分類 -- 訓練與評估
 */
 #include <Flag_DataReader.h>
 #include <Flag_Model.h>
-#include <Flag_DataExporter.h>
 #include <Wire.h>
 #include <SparkFun_APDS9960.h>
-
-// 取 APDS9960 的 3 個參數為一筆特徵資料
-#define FEATURE_DIM 3
 
 //------------全域變數------------
 // 讀取資料的物件
@@ -26,9 +22,6 @@ SparkFun_APDS9960 apds = SparkFun_APDS9960();
 // 資料預處理會用到的參數
 float mean;
 float sd;
-
-// 蒐集資料會用到的參數
-float sensorData[FEATURE_DIM]; 
 //--------------------------------
 
 void setup() {
@@ -36,23 +29,17 @@ void setup() {
   Serial.begin(115200);
 
   // 初始化 APDS9960
-  if(apds.init()){
-    Serial.println("APDS-9960 初始化完成");
-  }else{
+  while(!apds.init()){
     Serial.println("APDS-9960 初始化錯誤");
   }
 
   // 啟用 APDS-9960 光感測器
-  if(apds.enableLightSensor(false)){
-    Serial.println("光感測器正在運行");
-  }else{
+  while(!apds.enableLightSensor()){
     Serial.println("光感測器初始化錯誤");
   }
 
   // 啟用 APDS-9960 接近感測器
-  if(apds.enableProximitySensor(false)){
-    Serial.println("接近感測器正在運行");
-  }else{ 
+  while(!apds.enableProximitySensor()){
     Serial.println("接近感測器初始化錯誤");
   }
   
@@ -61,19 +48,19 @@ void setup() {
   digitalWrite(LED_BUILTIN, HIGH);
 
   // ----------------- 資料預處理 ------------------
-  // 多元分類類型的資料讀取
+  // 二元分類類型的訓練資料讀取
   trainData = trainDataReader.read(
     "/dataset/unripe.txt,/dataset/ripe.txt", 
     trainDataReader.MODE_BINARY
   );
  
-  // 取得特徵資料的平均值
+  // 取得訓練特徵資料的平均值
   mean = trainData->featureMean;
 
-  // 取得特徵資料的標準差
+  // 取得訓練特徵資料的標準差
   sd = trainData->featureSd;
         
-  // 特徵資料正規化: 標準差法
+  // 縮放訓練特徵資料: 標準化
   for(int j = 0;
       j < trainData->featureDataArryLen;
       j++)
@@ -100,7 +87,7 @@ void setup() {
       .neurons = 10, 
       .activationType = model.ACTIVATION_RELU
     },
-    {
+    { // 輸出層  
       .layerType = model.LAYER_DENSE,
       .neurons = 1,
       .activationType = model.ACTIVATION_SIGMOID
@@ -117,7 +104,7 @@ void setup() {
   modelPara.optimizerPara = {
     .optimizerType = model.OPTIMIZER_ADAM,
     .learningRate = 0.001,
-    .epochs = 2000
+    .epochs = 3000
   };
   model.begin(&modelPara);
 
@@ -149,10 +136,12 @@ void setup() {
   );
   
   // 匯出模型
-  model.save();
+  model.save(mean, sd);
 }
 
 void loop(){
+  // ----------------- 評估模型 --------------------
+  float sensorData[trainData->featureDim]; 
   uint8_t proximity_data = 0;
   uint16_t red_light = 0;
   uint16_t green_light = 0;
@@ -160,25 +149,22 @@ void loop(){
   uint16_t ambient_light = 0;
 
   if(!apds.readProximity(proximity_data)){
-    Serial.println("此次讀取接近值錯誤");
+    Serial.println("讀取接近值錯誤");
   }
 
-  // 當開始蒐集資料的條件達成時, 開始蒐集
+  // 當足夠接近時, 開始蒐集
   if (proximity_data == 255) {
-    // 蒐集資料時, 內建指示燈會亮
+    // 辨識時, 內建指示燈會亮
     digitalWrite(LED_BUILTIN, LOW);
 
-    // 偵測是否要開始蒐集資料
     if(!apds.readAmbientLight(ambient_light)  ||
        !apds.readRedLight(red_light)          ||
        !apds.readGreenLight(green_light)      ||
        !apds.readBlueLight(blue_light)){
-      Serial.println("Error reading light values");
+      Serial.println("讀值錯誤");
     }else{
-      // 計算總信號中各種顏色的比例。 它們被標準化為0至1的範圍。
+      // 取得各種顏色的比例
       float sum = red_light + green_light + blue_light;
-
-      // 偵測顏色會用到的參數
       float redRatio = 0;
       float greenRatio = 0;
       float blueRatio = 0;
@@ -193,36 +179,41 @@ void loop(){
       sensorData[1] = greenRatio;
       sensorData[2] = blueRatio;
 
-      // 取得一筆特徵資料, 並使用訓練好的模型來預測以進行評估
-      float *eval_feature_data = sensorData; 
-      uint16_t eval_feature_shape[] = {1, FEATURE_DIM};
-      aitensor_t eval_feature_tensor = AITENSOR_2D_F32(
-        eval_feature_shape, 
-        eval_feature_data
-      );
-      aitensor_t *eval_output_tensor;
-      float predictVal;
-
       // 測試資料預處理
-      for(int i = 0; i < FEATURE_DIM ; i++){
-        eval_feature_data[i] = 
-          (eval_feature_data[i] - mean) / sd;
+      float *test_feature_data = sensorData; 
+      for(int i = 0; i < trainData->featureDim; i++){
+        test_feature_data[i] = 
+          (sensorData[i] - mean) / sd;
       }
-
       // 模型預測
-      eval_output_tensor = model.predict(&eval_feature_tensor);
-      model.getResult(eval_output_tensor, &predictVal);
+      uint16_t test_feature_shape[] = {
+        1, // 每次測試一筆資料
+        trainData->featureDim
+      };
+      aitensor_t test_feature_tensor = AITENSOR_2D_F32(
+        test_feature_shape, 
+        test_feature_data
+      );
+      aitensor_t *test_output_tensor;
+
+      test_output_tensor = model.predict(
+        &test_feature_tensor
+      );
       
       // 輸出預測結果
+      float predictVal;
+      model.getResult(
+        test_output_tensor, 
+        &predictVal
+      );
       Serial.print("預測結果: ");
-
-      // 找到機率最大的索引值
-      Serial.println(predictVal);
-      
+      Serial.print(predictVal);
+      if(predictVal > 0.5) Serial.println(" 已熟成");
+      else                 Serial.println(" 未熟成");
       delay(1000);
     }
   } else {
-    // 未蒐集資料時, 內建指示燈不亮
+    // 未辨識時, 內建指示燈不亮
     digitalWrite(LED_BUILTIN, HIGH);
   }
 }

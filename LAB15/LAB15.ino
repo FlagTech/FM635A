@@ -1,119 +1,117 @@
 /*
-  農產品識別系統
+  水果熟成分類系統 -- IFTTT
 */
-#include <Flag_DataReader.h>
 #include <Flag_Model.h>
-#include <Flag_DataExporter.h>
 #include <Wire.h>
 #include <SparkFun_APDS9960.h>
+#include <WiFi.h>
+#include <HTTPClient.h>
 
-#define LED_ON  0
-#define LED_OFF 1
-
-// 取APDS9960的3個參數(SENSOR_PARA)為一筆特徵資料
-#define SENSOR_PARA 3
-#define FEATURE_DIM SENSOR_PARA
+#define AP_SSID    "Xperia XZ Premium_db49"
+#define AP_PWD     "12345678"
+#define IFTTT_URL  "https://maker.ifttt.com/trigger/banana/with/key/dg9J7YHL0mMuDaaRGs9pNU"
 
 //------------全域變數------------
-// 讀取資料的物件
-Flag_DataReader reader;
-Flag_DataBuffer *data;
-
 // 神經網路模型
 Flag_Model model; 
 
 // 感測器的物件
 SparkFun_APDS9960 apds = SparkFun_APDS9960();
 
-// 訓練用的特徵資料
-float *train_feature_data;
+// 計時器變數
+uint8_t resetTimer;
+uint32_t lastTime;
 
-// 對應特徵資料的標籤值
-float *train_label_data;
-
-// 資料預處理會用到的參數
-float mean;
-float sd;
-
-// 蒐集資料會用到的參數
-float sensorData[FEATURE_DIM]; 
+// 未熟香蕉數量
+uint32_t unripeCnt;
 //--------------------------------
 
+// 傳送 LINE 訊息
+void notify(uint32_t unripeTotal){
+  String ifttt_url = IFTTT_URL;
+  String url = ifttt_url + 
+    "?value1=" + String(unripeTotal);
+  
+  HTTPClient http;
+  http.begin(url);
+  int httpCode = http.GET();
+  if(httpCode < 0) Serial.println("連線失敗");
+  else             Serial.println("連線成功");
+  http.end();
+}
+
 void setup() {
-  // UART設置
+  // 序列埠設置
   Serial.begin(115200);
 
-  // 初始化APDS9960
-  if(apds.init()) Serial.println(F("APDS-9960初始化完成"));
-  else            Serial.println(F("APDS-9960初始化錯誤"));
-  
-  // 啟用APDS-9960光傳感器
-  if(apds.enableLightSensor(false)) Serial.println(F("光傳感器正在運行"));
-  else                              Serial.println(F("光傳感器初始化錯誤"));
-  
-  // 調整接近傳感器增益
-  if(!apds.setProximityGain(PGAIN_2X)) Serial.println(F("設置PGAIN時出現問題"));
-  
-  // 啟用APDS-9960接近傳感器
-  if(apds.enableProximitySensor(false)) Serial.println(F("接近傳感器正在運行"));
-  else                                  Serial.println(F("傳感器初始化錯誤"));
-  
-  // GPIO設置
-  pinMode(LED_BUILTIN, OUTPUT);
-  digitalWrite(LED_BUILTIN, LED_OFF);
-
-  // 多元分類類型的資料讀取
-  data = reader.read("/dataset/red.txt,/dataset/blue.txt,/dataset/yellow.txt", reader.MODE_CATEGORICAL);
-  
-  // 設定訓練用的特徵資料
-  train_feature_data = data->feature;
-
-  // 設定對應特徵資料的標籤值
-  train_label_data = data->label;
-
-  // 取得特徵資料的平均值
-  mean = data->featureMean;
-
-  // 取得特徵資料的標準差
-  sd = data->featureSd;
-        
-  // 特徵資料正規化: 標準差法
-  for(int j = 0; j < data->featureDataArryLen; j++){
-    train_feature_data[j] = (train_feature_data[j] - mean) / sd;
+  // 初始化 APDS9960
+  while(!apds.init()){
+    Serial.println("APDS-9960 初始化錯誤");
   }
 
-  Serial.println(F("----- 農產品識別系統 -----"));
-  Serial.println();
+  // 啟用 APDS-9960 光感測器
+  while(!apds.enableLightSensor()){
+    Serial.println("光感測器初始化錯誤");
+  }
 
-  // -------------------------- 建構模型 --------------------------
+  // 啟用 APDS-9960 接近感測器
+  while(!apds.enableProximitySensor()){
+    Serial.println("接近感測器初始化錯誤");
+  }
+  
+  // 腳位設置
+  pinMode(LED_BUILTIN, OUTPUT);
+  pinMode(32, OUTPUT);
+  digitalWrite(LED_BUILTIN, HIGH);
+  digitalWrite(32, LOW);
+
+  // Wi-Fi 設置
+  WiFi.begin(AP_SSID, AP_PWD);
+  while(WiFi.status() != WL_CONNECTED) {
+    Serial.print(".");
+    delay(500);
+  }
+  Serial.println("\n成功連上基地台!");
+
+
+  // ----------------- 建構模型 --------------------
   // 讀取已訓練的模型檔
-  model.begin("/color_model.json");
+  model.begin("/banana_model.json");
+
+  // 初始化計時器變數
+  resetTimer = false;
+  lastTime = millis();
+
+  // 清除未熟香蕉數量
+  unripeCnt = 0;
 }
 
 void loop(){
+  // ----------------- 即時預測 --------------------
+  float sensorData[model.inputLayerDim]; 
   uint8_t proximity_data = 0;
-  uint16_t red_light = 0,green_light = 0,blue_light = 0, ambient_light = 0;
+  uint16_t red_light = 0;
+  uint16_t green_light = 0;
+  uint16_t blue_light = 0;
+  uint16_t ambient_light = 0;
 
   if(!apds.readProximity(proximity_data)){
-    Serial.println("此次讀取接近值錯誤");
+    Serial.println("讀取接近值錯誤");
   }
 
-  // 當開始蒐集資料的條件達成時, 開始蒐集
+  // 當足夠接近時, 開始蒐集
   if (proximity_data == 255) {
-    // 蒐集資料時, 內建指示燈會亮
-    digitalWrite(LED_BUILTIN, LED_ON);
+    // 辨識時, 內建指示燈會亮
+    digitalWrite(LED_BUILTIN, LOW);
 
-    // 偵測是否要開始蒐集資料
     if(!apds.readAmbientLight(ambient_light)  ||
        !apds.readRedLight(red_light)          ||
        !apds.readGreenLight(green_light)      ||
        !apds.readBlueLight(blue_light)){
-      Serial.println("Error reading light values");
+      Serial.println("讀值錯誤");
     }else{
-      // 計算總信號中各種顏色的比例。 它們被標準化為0至1的範圍。
+      // 取得各種顏色的比例
       float sum = red_light + green_light + blue_light;
-
-      // 偵測顏色會用到的參數
       float redRatio = 0;
       float greenRatio = 0;
       float blueRatio = 0;
@@ -128,38 +126,60 @@ void loop(){
       sensorData[1] = greenRatio;
       sensorData[2] = blueRatio;
 
-      // 取得一筆特徵資料, 並使用訓練好的模型來進行預測
-      float *test_feature_data = sensorData; 
-      uint16_t test_feature_shape[] = {1, FEATURE_DIM};
-      aitensor_t test_feature_tensor = AITENSOR_2D_F32(test_feature_shape, test_feature_data);
-      aitensor_t *test_output_tensor;
-      float predictVal[model.getNumOfOutputs()];
-
       // 測試資料預處理
-      for(int i = 0; i < FEATURE_DIM ; i++){
-        test_feature_data[i] = (test_feature_data[i] - mean) / sd;
-      }
-
-      // 模型預測
-      test_output_tensor = model.predict(&test_feature_tensor);
-      model.getResult(test_output_tensor, predictVal);
-
-      // 模型預測
-      uint8_t maxIndex = model.argmax(predictVal);
-      if(predictVal[maxIndex] > 0.99){
-        switch(maxIndex){
-          case 0:  Serial.println("草莓"); break;
-          case 1:  Serial.println("藍莓"); break;
-          case 2:  Serial.println("香蕉"); break;
-        }
-      }else{
-        Serial.println("無法識別");
+      float *test_feature_data = sensorData; 
+      for(int i = 0; i < model.inputLayerDim; i++){
+        test_feature_data[i] = 
+          (sensorData[i] - model.mean) / model.sd;
       }
       
+      // 模型預測
+      uint16_t test_feature_shape[] = {
+        1, // 每次測試一筆資料 
+        model.inputLayerDim
+      };
+      aitensor_t test_feature_tensor = AITENSOR_2D_F32(
+        test_feature_shape, 
+        test_feature_data
+      );
+      aitensor_t *test_output_tensor;
+
+      test_output_tensor = model.predict(
+        &test_feature_tensor
+      );
+
+      // 輸出預測結果
+      float predictVal;
+      model.getResult(
+        test_output_tensor, 
+        &predictVal
+      );
+      Serial.print("預測結果: ");
+      Serial.print(predictVal);
+      if(predictVal > 0.5) {
+        Serial.println(" 已熟成");
+      }else{
+        unripeCnt++;
+        Serial.println(" 未熟成");
+      }
+      digitalWrite(32, HIGH);  
+      delay(300);
+      digitalWrite(32, LOW); 
       delay(1000);
+      resetTimer = true;
     }
   } else {
-    // 未蒐集資料時, 內建指示燈不亮
-    digitalWrite(LED_BUILTIN, LED_OFF);
+    // 未辨識時, 內建指示燈不亮
+    digitalWrite(LED_BUILTIN, HIGH);
+    if(resetTimer){
+      lastTime = millis();
+      resetTimer = false;
+    }
+
+    // 判斷是否檢測完畢
+    if(millis() - lastTime > 8000){
+      notify(unripeCnt);
+      while(1);
+    }
   }
 }
