@@ -51,6 +51,10 @@ void setup() {
   sensorArrayIdx = 0;
   dataCnt = 0;
   classCnt = 0;
+
+  Serial.println(
+    "請將 APDS-9960 感測器靠近物件, 以蒐集特徵資料\n"
+  );
 }
 
 void loop(){
@@ -66,7 +70,7 @@ void loop(){
 
   // 當足夠接近時, 開始蒐集
   if(proximity_data == 255 && dataCnt != ROUND){
-    // 蒐集資料時, 內建指示燈會亮
+    // 蒐集資料時, 點亮內建指示燈
     digitalWrite(LED_BUILTIN, LOW);
 
     if(!apds.readAmbientLight(ambient_light)  ||
@@ -135,7 +139,7 @@ void loop(){
         Serial.println(q);
         delay(1000);
       }
-      Serial.println();
+      Serial.println("請繼續蒐集下一個物件的特徵資料\n");
 
       // 要蒐集另一類, 故清 0 
       dataCnt = 0;

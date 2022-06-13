@@ -185,6 +185,7 @@ void loop(){
         test_feature_data[i] = 
           (sensorData[i] - mean) / sd;
       }
+      
       // 模型預測
       uint16_t test_feature_shape[] = {
         1, // 每次測試一筆資料

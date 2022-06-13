@@ -127,7 +127,7 @@ void setup(){
 
   // Wi-Fi 設置
   WiFi.begin(AP_SSID, AP_PWD);
-  while(WiFi.status() != WL_CONNECTED) {
+  while(WiFi.status() != WL_CONNECTED){
     Serial.print(".");
     delay(500);
   }

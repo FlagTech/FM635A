@@ -146,14 +146,27 @@ void loop() {
   // ----------------- 評估模型 --------------------
   // 當按鈕按下時, 開始蒐集資料
   if(collectBtn.read()){
-    // 蒐集資料時, 內建指示燈會亮
+    // 蒐集資料時, 點亮內建指示燈
     digitalWrite(LED_BUILTIN, LOW);
 
     // 每 100 毫秒為一個週期來取一次 MPU6050 資料
     if(millis() - lastMeasTime > 100){
       // MPU6050 資料更新
       mpu6050.update();
-
+      sensorData[sensorArrayIdx] = mpu6050.data.accX;
+      sensorArrayIdx++;
+      sensorData[sensorArrayIdx] = mpu6050.data.accY;
+      sensorArrayIdx++;
+      sensorData[sensorArrayIdx] = mpu6050.data.accZ;
+      sensorArrayIdx++;
+      sensorData[sensorArrayIdx] = mpu6050.data.gyrX;
+      sensorArrayIdx++;
+      sensorData[sensorArrayIdx] = mpu6050.data.gyrY;
+      sensorArrayIdx++;
+      sensorData[sensorArrayIdx] = mpu6050.data.gyrZ;
+      sensorArrayIdx++;
+      collectFinishedCond++;
+      
       // 連續取 10 個週期作為一筆特徵資料, 
       // 也就是一秒會取到一筆特徵資料
       if(collectFinishedCond == PERIOD){
@@ -163,6 +176,7 @@ void loop() {
           test_feature_data[i] = 
             (sensorData[i] - mean) / sd;
         }
+        
         // 模型預測
         uint16_t test_feature_shape[] = {
           1, // 每次測試一筆資料
@@ -193,25 +207,11 @@ void loop() {
 
         // 要先放開按鈕才能再做資料的蒐集
         while(collectBtn.read());
-      }else{
-        sensorData[sensorArrayIdx] = mpu6050.data.accX;
-        sensorArrayIdx++;
-        sensorData[sensorArrayIdx] = mpu6050.data.accY;
-        sensorArrayIdx++;
-        sensorData[sensorArrayIdx] = mpu6050.data.accZ;
-        sensorArrayIdx++;
-        sensorData[sensorArrayIdx] = mpu6050.data.gyrX;
-        sensorArrayIdx++;
-        sensorData[sensorArrayIdx] = mpu6050.data.gyrY;
-        sensorArrayIdx++;
-        sensorData[sensorArrayIdx] = mpu6050.data.gyrZ;
-        sensorArrayIdx++;
-        collectFinishedCond++;
       }
       lastMeasTime = millis();
     }
   }else{
-    // 未蒐集資料時, 內建指示燈不亮
+    // 未蒐集資料時, 熄滅內建指示燈
     digitalWrite(LED_BUILTIN, HIGH);
 
     // 按鈕放開, 則代表特徵資料要重新蒐集

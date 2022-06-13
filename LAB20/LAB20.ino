@@ -52,30 +52,30 @@ void notify(){
   http.end();
 }
 
+// 密碼 : 213
+uint8_t pwd[] = {2, 1, 3}; 
+
+// 狀態
+enum{FIRST_WORD,SECOND_WORD,THIRD_WORD,TOTAL_STATE};
+
+// 狀態變數
+uint8_t state = FIRST_WORD;
+
 // 密碼檢查
 void pwdCheck(uint8_t gesture){
-  // 密碼 : 213
-  uint8_t pwd[] = {2, 1, 3}; 
-
-  // 狀態
-  enum{FIRST_WORD,SECOND_WORD,THIRD_WORD,TOTAL_STATE};
-
-  // 狀態變數
-  static uint8_t state = FIRST_WORD;
-
   // 狀態機
   if(gesture == pwd[state]) {
     state++;
-    if(state == TOTAL_STATE){
-      Serial.println("解鎖成功");
-      servo.write(UNLOCK);
-      notify();
-      state = FIRST_WORD;
-    }
   }else{
     Serial.println("輸入密碼錯誤, 請重新輸入");
     state = FIRST_WORD;
   }
+  if(state == TOTAL_STATE){
+    Serial.println("解鎖成功");
+    servo.write(UNLOCK);
+    notify();
+    state = FIRST_WORD;
+  }             
 }
 
 void setup() {
@@ -116,14 +116,27 @@ void loop() {
   // ----------------- 即時預測 --------------------
   // 當按鈕按下時, 開始蒐集資料
   if(collectBtn.read()){
-    // 蒐集資料時, 內建指示燈會亮
+    // 蒐集資料時, 點亮內建指示燈
     digitalWrite(LED_BUILTIN, LOW);
 
     // 每 100 毫秒為一個週期來取一次 MPU6050 資料
     if(millis() - lastMeasTime > 100){
       // MPU6050 資料更新
       mpu6050.update();
-
+      sensorData[sensorArrayIdx] = mpu6050.data.accX;
+      sensorArrayIdx++;
+      sensorData[sensorArrayIdx] = mpu6050.data.accY;
+      sensorArrayIdx++;
+      sensorData[sensorArrayIdx] = mpu6050.data.accZ;
+      sensorArrayIdx++;
+      sensorData[sensorArrayIdx] = mpu6050.data.gyrX;
+      sensorArrayIdx++;
+      sensorData[sensorArrayIdx] = mpu6050.data.gyrY;
+      sensorArrayIdx++;
+      sensorData[sensorArrayIdx] = mpu6050.data.gyrZ;
+      sensorArrayIdx++;
+      collectFinishedCond++;
+      
       // 連續取 10 個週期作為一筆特徵資料, 
       // 也就是一秒會取到一筆特徵資料
       if(collectFinishedCond == PERIOD){
@@ -172,25 +185,11 @@ void loop() {
         
         // 要先放開按鈕才能再做資料的蒐集
         while(collectBtn.read());
-      }else{
-        sensorData[sensorArrayIdx] = mpu6050.data.accX;
-        sensorArrayIdx++;
-        sensorData[sensorArrayIdx] = mpu6050.data.accY;
-        sensorArrayIdx++;
-        sensorData[sensorArrayIdx] = mpu6050.data.accZ;
-        sensorArrayIdx++;
-        sensorData[sensorArrayIdx] = mpu6050.data.gyrX;
-        sensorArrayIdx++;
-        sensorData[sensorArrayIdx] = mpu6050.data.gyrY;
-        sensorArrayIdx++;
-        sensorData[sensorArrayIdx] = mpu6050.data.gyrZ;
-        sensorArrayIdx++;
-        collectFinishedCond++;
       }
       lastMeasTime = millis();
     }
   }else{
-    // 未蒐集資料時, 內建指示燈不亮
+    // 未蒐集資料時, 熄滅內建指示燈
     digitalWrite(LED_BUILTIN, HIGH);
 
     // 按鈕放開, 則代表特徵資料要重新蒐集

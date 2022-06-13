@@ -73,7 +73,6 @@ void setup() {
   }
   Serial.println("\n成功連上基地台!");
 
-
   // ----------------- 建構模型 --------------------
   // 讀取已訓練的模型檔
   model.begin("/banana_model.json");
@@ -84,6 +83,8 @@ void setup() {
 
   // 清除未熟香蕉數量
   unripeCnt = 0;
+
+  Serial.println("檢測開始");
 }
 
 void loop(){
@@ -179,6 +180,7 @@ void loop(){
     // 判斷是否檢測完畢
     if(millis() - lastTime > 8000){
       notify(unripeCnt);
+      Serial.println("檢測結束");
       while(1);
     }
   }

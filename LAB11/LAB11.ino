@@ -47,9 +47,9 @@ void loop(){
   Serial.print("接近值: ");
   Serial.println(proximity_data);
 
-  // RGB 偵測
+  // 近距離時啟用顏色偵測
   if(proximity_data == 255){
-    // 偵測時指示燈會亮
+    // 偵測時點亮指示燈
     digitalWrite(LED_BUILTIN, LOW);
 
     if(!apds.readAmbientLight(ambient_light)  ||

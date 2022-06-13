@@ -49,18 +49,35 @@ void setup(){
   lastMeasTime = 0;
   dataCnt = 0;
   classCnt = 0;
+
+  Serial.println(
+    "請按著按鈕並做出手勢, 以蒐集手勢特徵\n"
+  );
 }
 
 void loop(){
   // 當按鈕按下時, 開始蒐集資料   
   if(collectBtn.read()){
-    // 蒐集資料時, 內建指示燈會亮
+    // 蒐集資料時, 點亮內建指示燈
     digitalWrite(LED_BUILTIN, LOW);
   
     // 每 100 毫秒為一個週期來取一次 MPU6050 資料
     if(millis() - lastMeasTime > 100){
       // MPU6050 資料更新
       mpu6050.update();
+      sensorData[sensorArrayIdx] = mpu6050.data.accX;
+      sensorArrayIdx++;
+      sensorData[sensorArrayIdx] = mpu6050.data.accY;
+      sensorArrayIdx++;
+      sensorData[sensorArrayIdx] = mpu6050.data.accZ;
+      sensorArrayIdx++;
+      sensorData[sensorArrayIdx] = mpu6050.data.gyrX;
+      sensorArrayIdx++;
+      sensorData[sensorArrayIdx] = mpu6050.data.gyrY;
+      sensorArrayIdx++;
+      sensorData[sensorArrayIdx] = mpu6050.data.gyrZ;
+      sensorArrayIdx++;
+      collectFinishedCond++;
 
       // 連續取 10 個週期作為一筆特徵資料, 
       // 也就是一秒會取到一筆特徵資料
@@ -98,37 +115,24 @@ void loop(){
 
           // 要蒐集下一類, 故清 0 
           dataCnt = 0;
+          Serial.println(
+            "請繼續蒐集下一個手勢的特徵資料\n"
+          );
         }
+       
+        lastArrayIdx = sensorArrayIdx;
 
         // 要先放開按鈕才能再做資料的蒐集
         while(collectBtn.read());
-      }else{
-        sensorData[sensorArrayIdx] = mpu6050.data.accX;
-        sensorArrayIdx++;
-        sensorData[sensorArrayIdx] = mpu6050.data.accY;
-        sensorArrayIdx++;
-        sensorData[sensorArrayIdx] = mpu6050.data.accZ;
-        sensorArrayIdx++;
-        sensorData[sensorArrayIdx] = mpu6050.data.gyrX;
-        sensorArrayIdx++;
-        sensorData[sensorArrayIdx] = mpu6050.data.gyrY;
-        sensorArrayIdx++;
-        sensorData[sensorArrayIdx] = mpu6050.data.gyrZ;
-        sensorArrayIdx++;
-        collectFinishedCond++;
       }
       lastMeasTime = millis();
     }
   }else{
-    // 未蒐集資料時, 內建指示燈不亮
+    // 未蒐集資料時, 熄滅內建指示燈
     digitalWrite(LED_BUILTIN, HIGH);
 
     // 若蒐集的中途放開按鈕, 則不足以形成一筆特徵資料
-    if(collectFinishedCond != PERIOD){
-      sensorArrayIdx = lastArrayIdx;
-    }else{
-      lastArrayIdx = sensorArrayIdx;
-    }
+    sensorArrayIdx = lastArrayIdx;
 
     // 按鈕放開, 則代表特徵資料要重新蒐集
     collectFinishedCond = 0;
