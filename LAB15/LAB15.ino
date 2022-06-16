@@ -7,9 +7,9 @@
 #include <WiFi.h>
 #include <HTTPClient.h>
 
-#define AP_SSID    "Xperia XZ Premium_db49"
-#define AP_PWD     "12345678"
-#define IFTTT_URL  "https://maker.ifttt.com/trigger/banana/with/key/dg9J7YHL0mMuDaaRGs9pNU"
+#define AP_SSID    "基地台SSID"
+#define AP_PWD     "基地台密碼"
+#define IFTTT_URL  "IFTTT請求路徑"
 
 //------------全域變數------------
 // 神經網路模型
