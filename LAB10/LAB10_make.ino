@@ -13,7 +13,7 @@
 
 #define AP_SSID    "基地台SSID"
 #define AP_PWD     "基地台密碼"
-#define IFTTT_URL  "MAKE請求路徑"
+#define MAKE_URL  "MAKE請求路徑"
 
 enum{RICE, FISH, MILK, VEGETABLE, FRUIT, PAGE_TOTAL};
 
@@ -96,8 +96,8 @@ void notify(uint8_t page, float totalWeight){
     "蔬菜類",
     "水果類"
   };
-  String ifttt_url = IFTTT_URL;
-  String url = ifttt_url + 
+  String make_url = MAKE_URL;
+  String url = make_url + 
     "?value1=" + urlEncode(str[page]) + 
     "&value2=" + String(totalWeight, 1);
 
