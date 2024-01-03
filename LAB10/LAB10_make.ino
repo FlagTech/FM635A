@@ -1,207 +1,216 @@
 /*
-  手勢解鎖門禁 - IFTTT
+  每日飲食攝取紀錄--MAKE
 */
-#include <Flag_Model.h>
-#include <Flag_MPU6050.h>
+#include "./inc/bitmap.h"
+#include <Wire.h>
+#include <Flag_UI.h>
 #include <Flag_Switch.h>
-#include <ESP32Servo.h>
+#include <Flag_Model.h>
+#include <Flag_HX711.h>
 #include <WiFi.h>
 #include <HTTPClient.h>
+#include <UrlEncode.h>
 
-#define AP_SSID    "FLAG-SCHOOL"
-#define AP_PWD     "12345678"
-#define IFTTT_URL  "https://hook.eu2.make.com/d4xpyed0kn5cgumjrxaw493do3uqamvg"
+#define AP_SSID    "基地台SSID"
+#define AP_PWD     "基地台密碼"
+#define IFTTT_URL  "MAKE請求路徑"
 
-// 定義 0 度解鎖, 90 度上鎖
-#define LOCK 90
-#define UNLOCK 0
+enum{RICE, FISH, MILK, VEGETABLE, FRUIT, PAGE_TOTAL};
 
-// 1 個週期取 MPU6050 的 6 個參數
-// 每 10 個週期為一筆特徵資料
-#define SENSOR_PARA 6
-#define PERIOD 10
-
-//------------全域變數------------
+// ------------全域變數------------
 // 神經網路模型
 Flag_Model model; 
 
+// OLED 物件
+Adafruit_SSD1306 display(
+  128,  // 螢幕寬度
+  64,   // 螢幕高度
+  &Wire // 指向 Wire 物件的指位器, I2C 通訊用
+);
+
 // 感測器的物件
-Flag_MPU6050 mpu6050;
-Flag_Switch collectBtn(19);
-Flag_Switch lockBtn(18);
+Flag_Switch btnPage(18);
+Flag_Switch btnRec(19);
+Flag_HX711  hx711(32, 33); // SCK, DT
 
-// 伺服馬達物件
-Servo servo;
+// UI 會用到的參數
+uint8_t currentPage;
+bool btnPagePressed;
+bool btnRecPressed;
+float currentWeight;
+float totalWeight[PAGE_TOTAL];
 
-// 即時預測會用到的參數
-float sensorData[PERIOD * SENSOR_PARA];
-uint32_t sensorArrayIdx;
-uint32_t collectFinishedCond;
-uint32_t lastMeasTime;
-//--------------------------------
+Flag_UI_Bitmap banner = Flag_UI_Bitmap(
+  0, 0, 128, 16, bitmap_banner_background
+);
+Flag_UI_Text txt[] = { 
+  Flag_UI_Text(40, 0, 2, BLACK, WHITE, "Rice"),
+  Flag_UI_Text(40, 0, 2, BLACK, WHITE, "Fish"),
+  Flag_UI_Text(40, 0, 2, BLACK, WHITE, "Milk"),
+  Flag_UI_Text(10, 0, 2, BLACK, WHITE, "Vegetable"),
+  Flag_UI_Text(35, 0, 2, BLACK, WHITE, "Fruit"),
+};
+Flag_UI_Bitmap bitmap[] = {
+  Flag_UI_Bitmap(0, 18, 44, 44, bitmap_rice),
+  Flag_UI_Bitmap(0, 18, 44, 44, bitmap_fish),
+  Flag_UI_Bitmap(0, 18, 44, 44, bitmap_milk),
+  Flag_UI_Bitmap(0, 18, 44, 44, bitmap_vegetable),
+  Flag_UI_Bitmap(0, 18, 44, 44, bitmap_fruit),
+};
+Flag_UI_Text weightLabel = Flag_UI_Text(
+  48, 20, 1, WHITE, BLACK, "Current:"
+);
+Flag_UI_Text weightTxt = Flag_UI_Text(
+  48, 30, 1, WHITE, BLACK, &currentWeight, 1, "g"
+);
+Flag_UI_Text totalWeightLabel = Flag_UI_Text(
+  48, 44, 1, WHITE, BLACK, "Total:"
+);
+Flag_UI_Text totalWeightTxt[] = {
+  Flag_UI_Text(
+    48, 54, 1, WHITE, BLACK, &totalWeight[RICE], 1, "g"
+  ),
+  Flag_UI_Text(
+    48, 54, 1, WHITE, BLACK, &totalWeight[FISH], 1, "g"
+  ),
+  Flag_UI_Text(
+    48, 54, 1, WHITE, BLACK, &totalWeight[MILK], 1, "g"
+  ),
+  Flag_UI_Text(
+    48, 54, 1, WHITE, BLACK, 
+    &totalWeight[VEGETABLE], 1, "g"
+  ),
+  Flag_UI_Text(
+    48, 54, 1, WHITE, BLACK, &totalWeight[FRUIT], 1,"g"
+  ),
+};
+Flag_UI_Page page[PAGE_TOTAL];
+// -------------------------------
 
 // 傳送 LINE 訊息
-void notify(){
+void notify(uint8_t page, float totalWeight){
+  String str[] = {
+    "全穀雜糧類",
+    "蛋豆魚肉類",
+    "乳品類",
+    "蔬菜類",
+    "水果類"
+  };
   String ifttt_url = IFTTT_URL;
+  String url = ifttt_url + 
+    "?value1=" + urlEncode(str[page]) + 
+    "&value2=" + String(totalWeight, 1);
 
   HTTPClient http;
-  http.begin(ifttt_url);
+  http.begin(url);
   int httpCode = http.GET();
   if(httpCode < 0) Serial.println("連線失敗");
   else             Serial.println("連線成功");
   http.end();
 }
 
-// 密碼 : 213
-uint8_t pwd[] = {2, 1, 3}; 
-
-// 狀態
-enum{FIRST_WORD,SECOND_WORD,THIRD_WORD,TOTAL_STATE};
-
-// 狀態變數
-uint8_t state = FIRST_WORD;
-
-// 密碼檢查
-void pwdCheck(uint8_t gesture){
-  // 狀態機
-  if(gesture == pwd[state]) {
-    state++;
-  }else{
-    Serial.println("輸入密碼錯誤, 請重新輸入");
-    state = FIRST_WORD;
-  }
-  if(state == TOTAL_STATE){
-    Serial.println("解鎖成功");
-    servo.write(UNLOCK);
-    notify();
-    state = FIRST_WORD;
-  }             
-}
-
-void setup() {
+void setup(){
   // 序列埠設置
   Serial.begin(115200);
 
-  // MPU6050 初始化
-  mpu6050.init();
-  while(!mpu6050.isReady()); 
+  // HX711 初始化
+  hx711.begin();
 
-  // 設定伺服馬達的接腳
-  servo.attach(33, 500, 2400);
-  servo.write(LOCK);
-  
-  // 腳位設置
-  pinMode(LED_BUILTIN, OUTPUT);
-  digitalWrite(LED_BUILTIN, HIGH);
-  
+  // 扣重調整
+  hx711.tare();
+
+  // OLED 初始化
+  if(!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)){
+    Serial.println("OLED初始化失敗, 請重置~");
+    while(1);
+  }
+
   // Wi-Fi 設置
   WiFi.begin(AP_SSID, AP_PWD);
-  while(WiFi.status() != WL_CONNECTED) {
+  while(WiFi.status() != WL_CONNECTED){
     Serial.print(".");
     delay(500);
   }
   Serial.println("\n成功連上基地台!");
 
-  // 清除蒐集資料會用到的參數
-  sensorArrayIdx = 0;
-  collectFinishedCond = 0;
-  lastMeasTime = 0;
+  // UI 參數初始化
+  currentPage = RICE;
+  btnPagePressed = false;
+  btnRecPressed = false;
+
+  // 第 1 頁 ~ 第 5 頁
+  for(uint8_t i = 0; i < PAGE_TOTAL; i++){
+    page[i].setDisplay(&display);
+    page[i].addWidget(&banner);
+    page[i].addWidget(&txt[i]);
+    page[i].addWidget(&bitmap[i]);
+    page[i].addWidget(&weightLabel);
+    page[i].addWidget(&weightTxt);
+    page[i].addWidget(&totalWeightLabel); 
+    page[i].addWidget(&totalWeightTxt[i]);
+  }
 
   // ----------------- 建構模型 --------------------
-  // 讀取已訓練的模型檔
-  model.begin("/gesture_model.json");
+  // 讀取已訓練好的模型檔
+  model.begin("/weight_model.json");
 }
 
-void loop() {
+void loop(){
   // ----------------- 即時預測 --------------------
-  // 當按鈕按下時, 開始蒐集資料
-  if(collectBtn.read()){
-    // 蒐集資料時, 點亮內建指示燈
-    digitalWrite(LED_BUILTIN, LOW);
+  // 測試資料預處理
+  float test_feature_data = 
+    (hx711.getWeightAsync() - model.mean) / model.sd;
+   
+  // 模型預測
+  uint16_t test_feature_shape[] = {
+    1, // 每次測試一筆資料
+    model.inputLayerDim
+  }; 
+  aitensor_t test_feature_tensor = AITENSOR_2D_F32(
+    test_feature_shape, 
+    &test_feature_data
+  );
+  aitensor_t *test_output_tensor;
 
-    // 每 100 毫秒為一個週期來取一次 MPU6050 資料
-    if(millis() - lastMeasTime > 100){
-      // MPU6050 資料更新
-      mpu6050.update();
-      sensorData[sensorArrayIdx] = mpu6050.data.accX;
-      sensorArrayIdx++;
-      sensorData[sensorArrayIdx] = mpu6050.data.accY;
-      sensorArrayIdx++;
-      sensorData[sensorArrayIdx] = mpu6050.data.accZ;
-      sensorArrayIdx++;
-      sensorData[sensorArrayIdx] = mpu6050.data.gyrX;
-      sensorArrayIdx++;
-      sensorData[sensorArrayIdx] = mpu6050.data.gyrY;
-      sensorArrayIdx++;
-      sensorData[sensorArrayIdx] = mpu6050.data.gyrZ;
-      sensorArrayIdx++;
-      collectFinishedCond++;
-      
-      // 連續取 10 個週期作為一筆特徵資料, 
-      // 也就是一秒會取到一筆特徵資料
-      if(collectFinishedCond == PERIOD){
-        // 測試資料預處理
-        float *test_feature_data = sensorData;
-        for(int i = 0; i < model.inputLayerDim; i++){
-          test_feature_data[i] = 
-            (sensorData[i] - model.mean) / model.sd;
-        }
+  test_output_tensor = model.predict(
+    &test_feature_tensor
+  );
+  
+  // 輸出預測結果
+  float predictVal;
+  Serial.print("重量: ");
+  model.getResult(
+    test_output_tensor, 
+    model.labelMaxAbs, 
+    &predictVal
+  );
+  Serial.print(predictVal, 1); 
+  Serial.println('g');
+  currentWeight = predictVal;
 
-        // 模型預測
-        uint16_t test_feature_shape[] = {
-          1, // 每次測試一筆資料
-          model.inputLayerDim
-        };
-        aitensor_t test_feature_tensor=AITENSOR_2D_F32(
-          test_feature_shape,
-          test_feature_data
-        );
-        aitensor_t *test_output_tensor;
-        test_output_tensor = model.predict(
-          &test_feature_tensor
-        );
-
-        // 輸出預測結果
-        float predictVal[model.getNumOfOutputs()];
-        model.getResult(
-          test_output_tensor,
-          predictVal
-        );
-        Serial.print("預測結果: ");
-        model.printResult(predictVal);
-
-        // 找到信心值最大的索引
-        uint8_t maxIndex = model.argmax(predictVal);
-        Serial.print("你寫的數字為: "); 
-        Serial.println(maxIndex + 1);
-
-        // 檢查密碼
-        uint8_t gesture = maxIndex + 1;
-        if(predictVal[maxIndex] >= 0.70){
-          pwdCheck(gesture);
-        }else{
-          Serial.println("信心值不夠, 不做密碼判定");
-        }
-        
-        // 要先放開按鈕才能再做資料的蒐集
-        while(collectBtn.read());
-      }
-      lastMeasTime = millis();
+  // 頁面選擇按鈕
+  if(btnPage.read()){
+    if(currentPage <= FRUIT && !btnPagePressed) {
+      currentPage++;
+      if(currentPage == PAGE_TOTAL) currentPage = RICE;
+      btnPagePressed = true;
     }
   }else{
-    // 未蒐集資料時, 熄滅內建指示燈
-    digitalWrite(LED_BUILTIN, HIGH);
-
-    // 按鈕放開, 則代表特徵資料要重新蒐集
-    collectFinishedCond = 0;
-
-    // 若中途手放開按鈕, 則不足以形成一筆特徵資料
-    sensorArrayIdx = 0;
+    btnPagePressed = false;
+  }
+  
+  // 偵測記錄按鈕
+  if(btnRec.read()){
+    if(!btnRecPressed) {
+      btnRecPressed = true;
+      totalWeight[currentPage] += currentWeight;
+      // 發 LINE 訊息
+      notify(currentPage, totalWeight[currentPage]);
+    }
+  }else{
+    btnRecPressed = false;
   }
 
-  // 偵測上鎖按鈕
-  if(lockBtn.read()){
-    servo.write(LOCK);
-    delay(15);
-  }
+  // 顯示畫面
+  page[currentPage].show();
 }
